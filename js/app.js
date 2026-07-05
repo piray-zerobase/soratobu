@@ -87,14 +87,17 @@ function renderLogin(root){
   root.innerHTML=`
   <div class="authbox">
     <h2>ログイン</h2>
-    <label>メールアドレス</label><input class="inp" id="l-email" type="email" autocomplete="username">
-    <label>パスワード</label><input class="inp" id="l-pass" type="password" autocomplete="current-password">
+    <label for="l-email">メールアドレス</label><input class="inp" id="l-email" type="email" autocomplete="username">
+    <label for="l-pass">パスワード</label><input class="inp" id="l-pass" type="password" autocomplete="current-password">
     <button class="btn prim" style="width:100%;margin-top:14px;" onclick="doLogin()">ログイン</button>
     <div class="authnote">アカウントがない方は <a onclick="go('signup')">新規登録</a></div>
   </div>`;
 }
 async function doLogin(){
+  const btn = document.querySelector(".authbox .btn.prim");
+  if(btn) btn.disabled = true;
   const r = await auth.login($("l-email").value, $("l-pass").value);
+  if(btn) btn.disabled = false;
   if(r.err) return toast("⚠️ "+r.err);
   go("main");
 }
@@ -107,8 +110,8 @@ function renderSignup(root){
       <div class="pick on" id="su-doc" onclick="suRole('doctor')">🩺 医師</div>
       <div class="pick" id="su-hosp" onclick="suRole('hospital')">🏥 病院</div>
     </div>
-    <label>メールアドレス（ログインID）</label><input class="inp" id="s-email" type="email" autocomplete="username">
-    <label>パスワード（8文字以上）</label><input class="inp" id="s-pass" type="password" autocomplete="new-password">
+    <label for="s-email">メールアドレス（ログインID）</label><input class="inp" id="s-email" type="email" autocomplete="username">
+    <label for="s-pass">パスワード（8文字以上）</label><input class="inp" id="s-pass" type="password" autocomplete="new-password">
     <button class="btn prim" style="width:100%;margin-top:14px;" onclick="doSignup()">登録してはじめる</button>
     <div class="authnote">登録後にプロフィールと本人確認書類を提出します。<br>すでにアカウントがある方は <a onclick="go('login')">ログイン</a></div>
   </div>`;
@@ -116,7 +119,10 @@ function renderSignup(root){
 }
 function suRole(r){ window._suRole=r; $("su-doc").classList.toggle("on",r==="doctor"); $("su-hosp").classList.toggle("on",r==="hospital"); }
 async function doSignup(){
+  const btn = document.querySelector(".authbox .btn.prim");
+  if(btn) btn.disabled = true;
   const r = await auth.signup($("s-email").value, $("s-pass").value, window._suRole);
+  if(btn) btn.disabled = false;
   if(r.err) return toast("⚠️ "+r.err);
   toast("アカウントを作成しました。プロフィールを登録してください");
   go("main");
@@ -130,15 +136,15 @@ function renderDoctorOnboard(root){
   <div class="authbox wide">
     <h2>医師プロフィール登録（初回のみ）</h2>
     <p class="authp">登録内容は運営が<b>厚生労働省「医師等資格確認検索」と照合し、実在する医師であることを確認</b>してから有効になります。閲覧は審査中でも可能ですが、手上げ（応募）は承認後に開放されます。</p>
-    <label>氏名（免許証と同一表記）</label><input class="inp" id="d-name">
-    <label>医籍登録番号（数字のみ）</label><input class="inp" id="d-lic" placeholder="例）123456">
-    <label>保険医登録票の登録番号（保険診療をする場合のみ・任意）</label><input class="inp" id="d-hoken" placeholder="未入力可">
-    <label>診療科（複数可）</label><div class="opts" id="d-specs">${SPECS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
-    <label>対応できる業務（複数可）</label><div class="opts" id="d-caps">${CAPS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
-    <label>出発拠点（最寄りの空港）</label>
+    <label for="d-name">氏名（免許証と同一表記）<span class="req">＊必須</span></label><input class="inp" id="d-name">
+    <label for="d-lic">医籍登録番号（数字のみ）<span class="req">＊必須</span></label><input class="inp" id="d-lic" placeholder="例）123456">
+    <label for="d-hoken">保険医登録票の登録番号（保険診療をする場合のみ・任意）</label><input class="inp" id="d-hoken" placeholder="未入力可">
+    <label id="d-specs-label">診療科（複数可）<span class="req">＊必須</span></label><div class="opts" id="d-specs" role="group" aria-labelledby="d-specs-label">${SPECS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
+    <label id="d-caps-label">対応できる業務（複数可）<span class="req">＊必須</span></label><div class="opts" id="d-caps" role="group" aria-labelledby="d-caps-label">${CAPS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
+    <label for="d-base">出発拠点（最寄りの空港）</label>
     <select class="inp" id="d-base">${Object.keys(AIRPORTS).map(c=>`<option value="${c}" ${c==="ITM"?"selected":""}>${AIRPORTS[c].name}</option>`).join("")}</select>
-    <label>医師免許証の画像</label><input class="inp" id="d-file1" type="file" accept="image/*,.pdf">
-    <label>本人確認書類（運転免許証・マイナンバーカード等）</label><input class="inp" id="d-file2" type="file" accept="image/*,.pdf">
+    <label for="d-file1">医師免許証の画像<span class="req">＊必須</span></label><input class="inp" id="d-file1" type="file" accept="image/*,.pdf">
+    <label for="d-file2">本人確認書類（運転免許証・マイナンバーカード等）<span class="req">＊必須</span></label><input class="inp" id="d-file2" type="file" accept="image/*,.pdf">
     <button class="btn prim" style="width:100%;margin-top:16px;" onclick="doRegisterDoctor()">提出して審査を受ける</button>
     <div class="authnote">※デモ版ではファイルはアップロードされず、ファイル名のみ記録されます</div>
   </div>`;
@@ -164,12 +170,12 @@ function renderHospitalOnboard(root){
   <div class="authbox wide">
     <h2>病院情報の登録（初回のみ）</h2>
     <p class="authp">入力された病院名・住所は<b>実在病院マスタと自動照合</b>します。一致すればすぐに利用開始できます。一致しない場合は、運営が医療情報ネット（厚労省）等で実在を確認してから承認します。</p>
-    <label>都道府県</label>
+    <label for="h-pref">都道府県</label>
     <select class="inp" id="h-pref">${PREFS.map(p=>`<option>${p}</option>`).join("")}</select>
-    <label>病院名（正式名称）</label><input class="inp" id="h-name" placeholder="例）徳之島徳洲会病院">
-    <label>住所</label><input class="inp" id="h-addr" placeholder="例）鹿児島県大島郡徳之島町亀津7588">
-    <label>代表電話</label><input class="inp" id="h-tel" placeholder="例）0997-83-1100">
-    <label>受け入れ体制メモ（任意）</label><input class="inp" id="h-fac" placeholder="例）送迎あり・宿は病院手配・電子カルテあり">
+    <label for="h-name">病院名（正式名称）<span class="req">＊必須</span></label><input class="inp" id="h-name" placeholder="例）徳之島徳洲会病院">
+    <label for="h-addr">住所<span class="req">＊必須</span></label><input class="inp" id="h-addr" placeholder="例）鹿児島県大島郡徳之島町亀津7588">
+    <label for="h-tel">代表電話（任意）</label><input class="inp" id="h-tel" placeholder="例）0997-83-1100">
+    <label for="h-fac">受け入れ体制メモ（任意）</label><input class="inp" id="h-fac" placeholder="例）送迎あり・宿は病院手配・電子カルテあり">
     <button class="btn prim" style="width:100%;margin-top:16px;" onclick="doRegisterHospital()">登録して実在確認を受ける</button>
   </div>`;
 }
@@ -400,7 +406,7 @@ function drawChat(){
       ||'<div class="paneltitle" style="text-align:center;">最初のメッセージを送ってみましょう（例：当日の持ち物・オリエンの時間など）</div>'}
     </div>
     <div class="chatrow">
-      <input class="inp" id="chat-inp" placeholder="メッセージを入力" onkeydown="if(event.key==='Enter')sendChat()">
+      <input class="inp" id="chat-inp" placeholder="メッセージを入力" aria-label="メッセージを入力" onkeydown="if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229)sendChat()">
       <button class="btn teal" onclick="sendChat()">送信</button>
     </div>
     <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
@@ -480,9 +486,18 @@ function hospSlot(poId){
         ${asg.status==="confirmed"?`<button class="btn green" onclick="doComplete('${asg.id}')">勤務完了 ✓</button>`:""}</div>`);
   }
 }
-function doApprove(apId){ const r=api.approve(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("承認しました。医師と連絡先が相互開示されます"); }
-function doDecline(apId){ const r=api.decline(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("お断りしました"); }
-function doComplete(asgId){ const r=api.complete(hp().id,asgId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました"); }
+function doApprove(apId){
+  if(!confirm("この先生を承認しますか？\n承認すると、この枠の他の応募者は自動的にお断りになります。")) return;
+  const r=api.approve(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("承認しました。医師と連絡先が相互開示されます");
+}
+function doDecline(apId){
+  if(!confirm("この先生をお断りしますか？\nこの操作は取り消せません。")) return;
+  const r=api.decline(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("お断りしました");
+}
+function doComplete(asgId){
+  if(!confirm("この勤務を完了にしますか？\n完了後は取り消せません。")) return;
+  const r=api.complete(hp().id,asgId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました");
+}
 function openWizard(){ wiz={step:0,day:"",ti:0,ty:0,dept:"内科",pay:"120000",urgent:false,note:""}; drawWiz(); }
 function drawWiz(){
   const s=wiz.step; let body="";
@@ -513,8 +528,14 @@ function drawWiz(){
       ${s<3?`<button class="btn teal" onclick="wizNext()">次へ ›</button>`:`<button class="btn green" onclick="wizPublish()">公開する ✓</button>`}
     </div>`);
 }
-function wizNext(){ if(wiz.step===0&&!(+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");return;} wiz.step++; drawWiz(); }
+function wizNext(){
+  if(wiz.step===0&&!(+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");return;}
+  if(wiz.step===2&&!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");return;}
+  wiz.step++; drawWiz();
+}
 function wizPublish(){
+  if(!(+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");wiz.step=0;drawWiz();return;}
+  if(!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");wiz.step=2;drawWiz();return;}
   const t=W_TIMES[wiz.ti];
   const r=api.publishPosting(hp().id,{date:`2026-07-${String(+wiz.day).padStart(2,"0")}`,
     timeStart:t[0],timeEnd:t[1],overnight:t[2],type:W_TYPES[wiz.ty][0],cls:W_TYPES[wiz.ty][1],
