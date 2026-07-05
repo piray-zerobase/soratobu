@@ -562,9 +562,9 @@ function renderAdmin(root){
   <div style="margin-bottom:8px;"><button class="btn sm ghost" onclick="if(confirm('デモデータを初期化しますか？')){resetDB();location.reload();}">デモデータ初期化</button></div>
   ${DB.audit.slice(0,40).map(a=>`<div class="audit">[${a.ts}] <b>${esc(a.actor)}</b> ${esc(a.action)}<br>${esc(a.detail||"")}</div>`).join("")}`;
 }
-function doVerifyDr(id,ok){ const r=api.verifyDoctor(id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
-function doVerifyHp(id,ok){ const r=api.verifyHospital(id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
-function doVerifyCred(id,type,ok){ const r=api.verifyCredential(id,type,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast("処理しました"); }
+function doVerifyDr(id,ok){ const r=api.verifyDoctor(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
+function doVerifyHp(id,ok){ const r=api.verifyHospital(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
+function doVerifyCred(id,type,ok){ const r=api.verifyCredential(auth.session.userId,id,type,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast("処理しました"); }
 
 /* ---------- init ---------- */
 window.addEventListener("load", async ()=>{

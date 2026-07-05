@@ -256,6 +256,8 @@ const api = {
   decline(hospitalId, applicationId){
     const ap = DB.applications.find(a=>a.id===applicationId);
     if(!ap || ap.status!=="applied") return {err:"操作できない状態です"};
+    const po = DB.postings.find(p=>p.id===ap.postingId);
+    if(!po || po.hospitalId!==hospitalId) return {err:"自院の募集ではありません"};
     ap.status = "declined";
     audit(`hospital:${hospitalId}`, "application.decline", ap.id);
     saveDB(); return {ok:true};
@@ -270,6 +272,7 @@ const api = {
   complete(hospitalId, assignmentId){
     const asg = DB.assignments.find(a=>a.id===assignmentId);
     if(!asg || asg.status!=="confirmed") return {err:"完了にできない状態です"};
+    if(asg.hospitalId!==hospitalId) return {err:"自院の勤務ではありません"};
     asg.status = "completed";
     const po = DB.postings.find(p=>p.id===asg.postingId); if(po) po.status="completed";
     const dr = DB.doctors.find(d=>d.id===asg.doctorId); if(dr) dr.completedCount++;
@@ -288,12 +291,17 @@ const api = {
     const ap = DB.applications.find(a=>a.id===applicationId);
     if(!ap) return {err:"応募が見つかりません"};
     if(!["doctor","hospital"].includes(senderRole)) return {err:"運営はやりとりに参加できません（Legal by Design）"};
+    const po = DB.postings.find(p=>p.id===ap.postingId);
+    const isParty = senderRole==="doctor" ? ap.doctorId===senderId : !!po && po.hospitalId===senderId;
+    if(!isParty) return {err:"この応募の当事者ではありません"};
     if(!(text||"").trim()) return {err:"本文を入力してください"};
     DB.messages.push({id:"ms_"+(DB.seq++), applicationId, senderRole, senderId, text:text.trim(), ts:tsNow()});
     saveDB(); return {ok:true};
   },
-  /* 運営：実在確認（医師・病院） */
-  verifyDoctor(doctorId, approveIt){
+  /* 運営：実在確認（医師・病院）。actorUserIdがadminロールであることを必ず検証する */
+  verifyDoctor(actorUserId, doctorId, approveIt){
+    const actor = DB.users.find(u=>u.id===actorUserId);
+    if(!actor || actor.role!=="admin") return {err:"権限がありません"};
     const dr = DB.doctors.find(d=>d.id===doctorId);
     if(!dr || dr.status!=="審査中") return {err:"審査中の医師ではありません"};
     dr.status = approveIt ? "承認" : "却下";
@@ -302,7 +310,9 @@ const api = {
     audit("admin", "doctor.verify", `${dr.name}（医籍${dr.licenseNo}）→ ${dr.status}（厚労省 医師等資格確認検索で照合）`);
     saveDB(); return {ok:true};
   },
-  verifyHospital(hospitalId, approveIt){
+  verifyHospital(actorUserId, hospitalId, approveIt){
+    const actor = DB.users.find(u=>u.id===actorUserId);
+    if(!actor || actor.role!=="admin") return {err:"権限がありません"};
     const h = DB.hospitals.find(x=>x.id===hospitalId);
     if(!h || h.status!=="審査中") return {err:"審査中の病院ではありません"};
     h.status = approveIt ? "承認" : "却下";
@@ -310,7 +320,9 @@ const api = {
     audit("admin", "hospital.verify", `${h.name} → ${h.status}`);
     saveDB(); return {ok:true};
   },
-  verifyCredential(doctorId, type, approveIt){
+  verifyCredential(actorUserId, doctorId, type, approveIt){
+    const actor = DB.users.find(u=>u.id===actorUserId);
+    if(!actor || actor.role!=="admin") return {err:"権限がありません"};
     const dr = DB.doctors.find(d=>d.id===doctorId);
     const c = dr && dr.credentials.find(c=>c.type===type && c.status==="確認中");
     if(!c) return {err:"確認中の書類がありません"};
