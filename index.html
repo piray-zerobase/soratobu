@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>そらとぶ医局 — 僻地スポット勤務プラットフォーム</title>
+<meta name="description" content="離島・僻地のスポット医師募集と医師をつなぐ会員制プラットフォーム。地図から選び、実在便で行き帰りを決めて、ワンタップで手を挙げる。">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="gbar">
+  <div class="logo" onclick="go(auth.session?'main':'landing')">そらとぶ医局<small>v0.2 デモ（データはこのブラウザ内）</small></div>
+  <div id="hdr-right" class="hdr-right"></div>
+</header>
+
+<main class="wrap" id="root"></main>
+
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+
+<footer class="foot">
+  そらとぶ医局（仮称）は募集情報等提供の「場」を提供するサービスです。職業紹介（あっせん）は行いません。<br>
+  運営：株式会社ゼロベース（予定）｜ 本デモの病院名・募集内容はシステム検証用のサンプルです。
+</footer>
+
+<script src="js/master.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
