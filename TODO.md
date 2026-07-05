@@ -17,11 +17,11 @@
 - [x] **入力バリデーション強化**：医籍番号・電話番号・日付の形式チェックをフォーム側にも（store.js側は既存）
 - [x] **通知センター**：ヘッダーに🔔。自分宛イベント（手上げあり/承認された/見送り/メッセージ）を既読管理付きで一覧
 - [x] **病院の複数ユーザー**：HospitalUser相当（同じ病院に事務2人目を招待コードで追加）
-- [ ] **募集テンプレ保存**：病院が「前回の募集をコピーして作成」できるように
+- [x] **募集テンプレ保存**：病院が「前回の募集をコピーして作成」できるように
 - [ ] **医師の絞り込み**：日付×業務種別×エリアのフィルタ（地図・日付タブ共通）
 - [ ] **キャンセルフロー**：確定後の取り下げ（理由必須・相手に通知・AuditLog記録）※ペナルティ設計はしない
 - [ ] **Supabaseアダプタ骨格**：js/store-supabase.js を新設（同じAPI関数名でsupabase-js呼び出しの雛形＋接続設定ファイルconfig.example.js）。※実接続はSupabaseプロジェクト作成後
-- [ ] **単体テスト**：tests/store.test.mjs（node:testで状態遷移・資格ゲート・重複応募拒否を検証）＋実行方法をREADMEに
+- [x] **単体テスト**：tests/store.test.mjs（node:testで状態遷移・資格ゲート・重複応募拒否を検証）＋実行方法をREADMEに
 - [ ] **利用規約・プライバシーポリシーのドラフト**：docs/terms_draft.md（募集情報等提供・あっせん非該当・特定募集情報等提供事業者の届出前提で）
 
 ## 作業ログ
@@ -34,3 +34,5 @@
 - 2026-07-05 入力バリデーション強化：医籍登録番号（数字以外を入力時に自動除去＋5〜7桁チェックをdoRegisterDoctorに追加）・病院代表電話（type=telと数字/ハイフン以外の自動除去、isValidPhoneによる形式チェックを追加。未入力は引き続き任意）・募集ウィザードの日にち欄（数字以外を自動除去、Number.isIntegerで整数のみ許可するようwizNext/wizPublishを修正）をフォーム側にも実装。store.js側の権限チェック・重複防止ロジックは無変更。node --check全通過、既存node --test 12件も全通過
 - 2026-07-05 通知センター：ヘッダーに🔔ボタン（医師・病院ロールのみ表示）を追加。app.jsにnotifEvents()を新設し、応募（手上げ）・承認・見送り・チャットメッセージのうち自分宛のものを既存データ（applications/messages/postings）から動的に導出（新規の永続エンティティは追加せず、②のデータ構造は無変更）。既読管理はstore.jsに追加したDB.notifCursor（ユーザーごとの既読カーソル＝seq番号）とapi.markNotificationsRead()で実装し、通知センターを開くと未読バッジが消える。クリックで該当のチャット／応募一覧／募集詳細へ遷移。css/app.cssに.bell/.nbadge/.notifrowを追加（teal基調・バッジはpayオレンジで緊急の赤とは区別）。node --check全通過、既存node --test 16件（store 12 + seatAvailability 4）も全通過。vmサンドボックスでの手動シナリオ確認（応募→通知発生→承認→既読化）も実施
 - 2026-07-05 病院の複数ユーザー（HospitalUser相当）：②のデータ構造は変更せず、既存のUser（role=hospital, refId=hospitalId）が同じhospitalIdを指せる設計をそのまま利用。store.jsに病院ごとのinviteCode（8桁・紛らわしい文字除外のランダム生成、hospitals seed/registerHospital時に自動発行）と、api.joinHospitalByInviteCode(userId,code)（refId未設定のhospitalユーザーのみ参加可・二重所属や誤コードを拒否）／api.regenerateInviteCode(userId)（漏洩時の失効用）を追加。app.jsの病院オンボーディング画面に「招待コードで参加」タブを追加し、病院ダッシュボードに自院の招待コード表示・コピー・再発行ボタンを追加（css/app.cssに.invitecode追加）。docs/SECURITY_CHECKLIST.mdに招待コード機能の権限チェック観点を追記。tests/store.test.mjsに3テスト追加（正常参加・誤コード拒否/二重所属拒否・再発行と旧コード失効）、node --check全通過、node --test 15件（store 11 + seatAvailability 4）全通過
+- 2026-07-05 単体テスト：既存のtests/store.test.mjs（node:test、状態遷移・資格ゲート・重複応募拒否・権限チェック・招待コードを網羅、15件全通過）とREADMEの実行方法（node --test）記載により本項目の要件を満たしていたため、タスクとして[x]に反映（新規実装なし）
+- 2026-07-05 募集テンプレ保存：js/app.jsのopenWizard()にfromId引数を追加し、既存の募集（type/time/dept/pay/urgent/note）から募集ウィザードの初期値を復元できるように変更（日にちは新規入力必須のため空欄のまま）。openTemplatePicker()／useTemplate()を新設し、病院ダッシュボードに「📋 前回をコピー」ボタン（自院の過去募集がある場合のみ表示）から最新10件を選んで複製→公開できるようにした。②のデータ構造・store.jsのAPIは無変更（ビュー層のみの変更）。node --check全通過、node --test 15件全通過、Playwright（Chromiumヘッドレス）で実際にログイン→テンプレ選択→時間帯/業務/診療科/一言/報酬が復元されること→日にちのみ入力して公開→カレンダーに新規枠が反映されることを確認

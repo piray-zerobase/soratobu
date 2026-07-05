@@ -526,7 +526,8 @@ function renderHospital(root){
   const inbox=DB.applications.filter(a=>a.status==="applied"&&pos.some(p=>p.id===a.postingId)).length;
   root.innerHTML=`
   <div class="paneltitle">🏥 <b>${esc(h.name)}</b>（✓ ${esc(h.verifiedNote)}）
-    <button class="btn sm teal" style="margin-left:10px;" onclick="openWizard()">＋ 新規募集（3分）</button></div>
+    <button class="btn sm teal" style="margin-left:10px;" onclick="openWizard()">＋ 新規募集（3分）</button>
+    ${pos.length?`<button class="btn sm ghost" style="margin-left:6px;" onclick="openTemplatePicker()">📋 前回をコピー</button>`:""}</div>
   <div class="paneltitle">🔑 招待コード：<code class="invitecode">${esc(h.inviteCode)}</code>
     <button class="btn sm ghost" onclick="copyInviteCode('${esc(h.inviteCode)}')">コピー</button>
     <button class="btn sm ghost" onclick="doRegenInviteCode()">再発行</button>
@@ -612,7 +613,30 @@ function doComplete(asgId){
   if(!confirm("この勤務を完了にしますか？\n完了後は取り消せません。")) return;
   const r=api.complete(hp().id,asgId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました");
 }
-function openWizard(){ wiz={step:0,day:"",ti:0,ty:0,dept:"内科",pay:"120000",urgent:false,note:""}; drawWiz(); }
+function openWizard(fromId){
+  const src = fromId ? DB.postings.find(p=>p.id===fromId) : null;
+  if(src){
+    const tyIdx = W_TYPES.findIndex(t=>t[0]===src.type);
+    const tiIdx = W_TIMES.findIndex(t=>t[0]===src.timeStart && t[1]===src.timeEnd && t[2]===!!src.overnight);
+    wiz = {step:0, day:"", ti:tiIdx>=0?tiIdx:0, ty:tyIdx>=0?tyIdx:0,
+      dept:src.department||"内科", pay:String(src.pay||"120000"), urgent:!!src.urgent, note:src.note||""};
+  } else {
+    wiz={step:0,day:"",ti:0,ty:0,dept:"内科",pay:"120000",urgent:false,note:""};
+  }
+  drawWiz();
+}
+function openTemplatePicker(){
+  const h=hp();
+  const list=DB.postings.filter(p=>p.hospitalId===h.id).sort((a,b)=>seqOf(b.id)-seqOf(a.id)).slice(0,10);
+  openModal(`<h3>📋 前回の募集をコピー</h3>
+    <div class="sub">選んだ内容を元に、日にちだけ変えて公開できます</div>
+    ${list.map(p=>`<div class="appcard" style="cursor:pointer;" onclick="useTemplate('${p.id}')">
+      <span class="nm">${dstr(p.date)}(${dow(p.date)}) ${esc(p.type)}</span>
+      <div class="meta">${esc(p.department)}／${yen(p.pay)}${p.urgent?"／🚨 緊急":""}</div></div>`).join("")
+    ||'<div class="paneltitle" style="text-align:center;">コピーできる過去の募集がありません</div>'}
+    <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
+}
+function useTemplate(id){ closeModal(); openWizard(id); }
 function drawWiz(){
   const s=wiz.step; let body="";
   if(s===0) body=`<div class="q">① いつ来てほしい？（2026年7月の日にち）</div>
