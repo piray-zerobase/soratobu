@@ -84,6 +84,12 @@ function notifEvents(role, refId){
         text:`${hname(po.hospitalId)}／${dstr(po.date)} ${po.type} は見送りになりました`,
         action:`closeModal();DTAB='my';go('main')`});
     });
+    DB.assignments.filter(a=>a.doctorId===refId && a.status==="cancelled" && a.cancelledBy==="hospital").forEach(asg=>{
+      const po=DB.postings.find(p=>p.id===asg.postingId); if(!po) return;
+      evs.push({seq:seqOf(asg.id), icon:"❌",
+        text:`${hname(asg.hospitalId)}／${dstr(po.date)} ${po.type} の確定がキャンセルされました（理由：${short(asg.cancelReason||"")}）`,
+        action:`closeModal();DTAB='my';go('main')`});
+    });
     DB.messages.forEach(m=>{
       if(m.senderRole!=="hospital") return;
       const ap=DB.applications.find(a=>a.id===m.applicationId);
@@ -98,6 +104,12 @@ function notifEvents(role, refId){
           text:`${dname(a.doctorId)} 先生が ${dstr(po.date)} ${po.type} に手を挙げました`,
           action:`closeModal();hospSlot('${po.id}')`});
       });
+    });
+    DB.assignments.filter(a=>a.hospitalId===refId && a.status==="cancelled" && a.cancelledBy==="doctor").forEach(asg=>{
+      const po=DB.postings.find(p=>p.id===asg.postingId); if(!po) return;
+      evs.push({seq:seqOf(asg.id), icon:"❌",
+        text:`${dname(asg.doctorId)} 先生／${dstr(po.date)} ${po.type} の確定がキャンセルされました（理由：${short(asg.cancelReason||"")}）`,
+        action:`closeModal();hospSlot('${po.id}')`});
     });
     DB.messages.forEach(m=>{
       if(m.senderRole!=="doctor") return;
@@ -356,22 +368,27 @@ function renderMyPage(b,d){
     <span class="stat ${d.status==="承認"?"st-approved":"st-applied"}">${d.status==="承認"?"✓ 実在確認済":"審査中"}</span></div>
     <div class="meta">書類：${d.credentials.map(c=>`${c.type} <b>${c.status}</b>`).join("　")}</div></div>
   <div class="section-h">確定した勤務</div>
-  ${asgs.map(asg=>{const po=DB.postings.find(p=>p.id===asg.postingId);const ap=DB.applications.find(a=>a.postingId===asg.postingId&&a.doctorId===d.id&&a.status==="approved");return `
+  ${asgs.map(asg=>{const po=DB.postings.find(p=>p.id===asg.postingId);const ap=DB.applications.find(a=>a.postingId===asg.postingId&&a.doctorId===d.id&&a.status==="approved");
+    const label={confirmed:"確定",completed:"完了",cancelled:"キャンセル済"}[asg.status]||asg.status;
+    const cls={confirmed:"st-confirmed",completed:"st-completed",cancelled:"st-declined"}[asg.status]||"st-confirmed";
+    return `
     <div class="card"><div class="top"><div><div class="hosp">${esc(hname(asg.hospitalId))}</div>
       <div class="isl">📍 ${dstr(po.date)}(${dow(po.date)}) ${asg.termsSnapshot.time}・${po.type}</div></div>
-      <span class="stat ${asg.status==="completed"?"st-completed":"st-confirmed"}">${asg.status==="completed"?"完了":"確定"}</span></div>
+      <span class="stat ${cls}">${label}</span></div>
       <div class="meta">💰 ${yen(asg.termsSnapshot.pay)}（条件固定）／${asg.employmentType}</div>
       <div class="meta">✈ ${esc(asg.itinerary.summary)}</div>
+      ${asg.status==="cancelled"?`<div class="meta">キャンセル理由：${esc(asg.cancelReason||"")}</div>`:""}
       <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap;">
         ${ap?`<button class="btn sm teal" onclick="openChat('${ap.id}')">💬 病院とやりとり</button>`:""}
         ${asg.status==="confirmed"&&!(asg.itinerary.booking||"").startsWith("予約済")
           ?`<button class="btn sm ghost" onclick="doBook('${asg.id}')">🎫 便を予約した（自己申告）</button>`:""}
+        ${asg.status==="confirmed"?`<button class="btn sm ghost" onclick="doCancelAssignment('${asg.id}')">キャンセルする</button>`:""}
       </div></div>`;}).join("")||`<div class="paneltitle">まだありません</div>`}
   <div class="section-h">応募中・履歴</div>
   ${apps.map(a=>{const po=DB.postings.find(p=>p.id===a.postingId);return `
     <div class="card"><div class="top"><div><div class="hosp">${esc(hname(po.hospitalId))}</div>
       <div class="isl">📍 ${dstr(po.date)}(${dow(po.date)})・${po.type}</div></div>
-      <span class="stat st-${a.status}">${{applied:"承認待ち",approved:"承認済",declined:"見送り",withdrawn:"取り下げ"}[a.status]}</span></div>
+      <span class="stat st-${a.status==="cancelled"?"declined":a.status}">${{applied:"承認待ち",approved:"承認済",declined:"見送り",withdrawn:"取り下げ",cancelled:"キャンセル済"}[a.status]}</span></div>
       <div class="meta">✈ ${esc(a.itinerary.summary)}</div>
       <div style="display:flex;gap:8px;margin-top:9px;">
         ${["applied","approved"].includes(a.status)?`<button class="btn sm teal" onclick="openChat('${a.id}')">💬 やりとり</button>`:""}
@@ -509,6 +526,17 @@ function doBook(asgId){
   if(r.err) return toast("⚠️ "+r.err);
   render(); toast("予約済みにしました");
 }
+/* 確定後のキャンセル：医師・病院どちらの画面からも呼ばれる共通処理 */
+function doCancelAssignment(asgId){
+  const reason=prompt("キャンセルの理由を入力してください（相手に通知されます・必須）","");
+  if(reason===null) return;
+  if(!reason.trim()) return toast("⚠️ 理由を入力してください");
+  if(!confirm("確定した勤務をキャンセルします。よろしいですか？\nこの操作は取り消せません。")) return;
+  const s=auth.session;
+  const r=api.cancelAssignment(s.role, s.refId, asgId, reason);
+  if(r.err) return toast("⚠️ "+r.err);
+  closeModal(); render(); toast("キャンセルしました");
+}
 
 /* ---------- チャット（医師↔病院） ---------- */
 function openChat(apId){
@@ -525,7 +553,7 @@ function drawChat(){
     ? `<div class="notice" style="margin:8px 0;">📞 承認済みのため連絡先を開示：医師 ${esc(d.email)} ／ 病院 ${esc(h.phone||h.address||"登録住所参照")}</div>`
     : `<div class="legalmini" style="margin:6px 0;">連絡先は承認後に開示されます。それまではこのチャットでやりとりしてください。</div>`;
   openModal(`<h3>💬 ${esc(meRole==="doctor"?h.name:d.name+" 先生")} とのやりとり</h3>
-    <div class="sub">${dstr(po.date)}(${dow(po.date)}) ${po.type}／状態：${{applied:"承認待ち",approved:"承認済み",declined:"見送り",withdrawn:"取り下げ"}[ap.status]}</div>
+    <div class="sub">${dstr(po.date)}(${dow(po.date)}) ${po.type}／状態：${{applied:"承認待ち",approved:"承認済み",declined:"見送り",withdrawn:"取り下げ",cancelled:"キャンセル済"}[ap.status]}</div>
     ${contact}
     <div class="chatlog" id="chatlog">
       ${msgs.map(m=>`<div class="bubble ${m.senderRole===meRole?"mine":"theirs"}">
@@ -575,7 +603,7 @@ function renderHospital(root){
     cell.innerHTML=`<div class="num">${dd}</div>`;
     pos.filter(p=>+p.date.split("-")[2]===dd).forEach(p=>{
       const n=DB.applications.filter(a=>a.postingId===p.id&&a.status==="applied").length;
-      const asg=DB.assignments.find(a=>a.postingId===p.id);
+      const asg=DB.assignments.filter(a=>a.postingId===p.id).slice(-1)[0];
       const el=document.createElement("div");
       if(p.status==="open"){el.className="slot s-open"+(p.urgent?" blink2":"");el.textContent=`🟡 ${p.type} 応募${n}`;}
       else if(p.status==="confirmed"){el.className="slot s-conf";el.textContent=`🟢 ${p.type} ${dname(asg.doctorId).split(" ")[0]}`;}
@@ -603,7 +631,7 @@ function hospSlot(poId){
       :'<div class="paneltitle" style="text-align:center;padding:14px;">まだ手上げがありません。登録医師に公開中です。</div>'}
       <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
   } else {
-    const asg=DB.assignments.find(a=>a.postingId===poId);
+    const asg=DB.assignments.filter(a=>a.postingId===poId).slice(-1)[0];
     const ap=DB.applications.find(a=>a.postingId===poId&&a.status==="approved");
     openModal(`<h3>${p.status==="completed"?"完了":"確保済み"}（${dstr(p.date)} ${p.type}）</h3>
       <div class="summ">
@@ -615,6 +643,7 @@ function hospSlot(poId){
       </div>
       <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button>
         ${ap?`<button class="btn teal" onclick="openChat('${ap.id}')">💬 やりとり</button>`:""}
+        ${asg.status==="confirmed"?`<button class="btn ghost" onclick="doCancelAssignment('${asg.id}')">確定を取り消す</button>`:""}
         ${asg.status==="confirmed"?`<button class="btn green" onclick="doComplete('${asg.id}')">勤務完了 ✓</button>`:""}</div>`);
   }
 }

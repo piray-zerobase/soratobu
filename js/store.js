@@ -307,6 +307,25 @@ const api = {
     audit(`doctor:${doctorId}`, "application.withdraw", `${ap.id}（理由：${reason||"未記入"}）`);
     saveDB(); return {ok:true};
   },
+  /* 確定後のキャンセル（取り下げ）：医師・病院どちらからも可。理由必須・相手に通知・AuditLog記録。
+     ペナルティ設計はしない（回数記録・信用スコア等は追加しない）。募集は再公開し他の医師が応募できるようにする */
+  cancelAssignment(actorRole, actorId, assignmentId, reason){
+    if(!["doctor","hospital"].includes(actorRole)) return {err:"権限がありません"};
+    const asg = DB.assignments.find(a=>a.id===assignmentId);
+    if(!asg || asg.status!=="confirmed") return {err:"キャンセルできない状態です"};
+    const isParty = actorRole==="doctor" ? asg.doctorId===actorId : asg.hospitalId===actorId;
+    if(!isParty) return {err:"この勤務の当事者ではありません"};
+    if(!(reason||"").trim()) return {err:"キャンセルの理由を入力してください"};
+    asg.status = "cancelled";
+    asg.cancelReason = reason.trim();
+    asg.cancelledBy = actorRole;
+    const po = DB.postings.find(p=>p.id===asg.postingId);
+    if(po) po.status = "open";
+    const ap = DB.applications.find(a=>a.postingId===asg.postingId && a.doctorId===asg.doctorId && a.status==="approved");
+    if(ap) ap.status = "cancelled";
+    audit(`${actorRole}:${actorId}`, "assignment.cancel", `${assignmentId}（理由：${reason.trim()}）→ 募集を再公開`);
+    saveDB(); return {ok:true};
+  },
   complete(hospitalId, assignmentId){
     const asg = DB.assignments.find(a=>a.id===assignmentId);
     if(!asg || asg.status!=="confirmed") return {err:"完了にできない状態です"};

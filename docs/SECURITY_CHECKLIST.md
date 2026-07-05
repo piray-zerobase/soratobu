@@ -50,6 +50,21 @@ Supabase移行後は「本番移行時の再点検が必要な項目」を必ず
   のためXSSの懸念はない。ただし画面表示はUIから他病院の担当者にも見える情報のため、
   ログイン中の自院担当者のみに表示している（`renderHospital`は`hp()`＝自分の`refId`の病院のみ参照）。
 
+### 追記：キャンセルフロー（`cancelAssignment`）の権限チェック
+
+確定後の取り下げ（`cancelAssignment(actorRole, actorId, assignmentId, reason)`）を追加した際、
+以下を確認・実装した（`tests/store.test.mjs`で保証）。
+
+- `actorRole`は`doctor`/`hospital`のみ許可。運営（admin）はキャンセル操作に関与しない
+  （Legal by Designの原則どおり、運営はマッチングに介在しない）。
+- 当事者チェック：`doctor`なら`asg.doctorId===actorId`、`hospital`なら`asg.hospitalId===actorId`
+  を検証し、他人の勤務・他院の勤務IDを知っていてもキャンセルできないことをテストで確認。
+- 理由（`reason`）は必須。空文字・未入力は拒否する（ビュー側の`prompt`だけでなくAPI層でも検証）。
+  ペナルティ・信用スコア等は設計しない（Legal by Design、要件どおり）。
+- キャンセル済み・完了済みのAssignmentは再度キャンセルできない（`status!=="confirmed"`を拒否）。
+- キャンセル時は募集を`open`に戻し他の医師が再応募できるようにするが、既存の他候補の
+  `declined`状態は自動復元しない（改めて手を挙げ直す運用とし、意図しない自動マッチングを避ける）。
+
 ⚠️ **本番移行時の再点検が必要**：現状は「呼び出し元が渡すID文字列」を信用する設計
 （例：`hp().id`をview層が渡す）。これはクライアント内で完結するデモの制約であり、
 Supabase移行後はRow Level Security（RLS）でDB側からも同様の所有者チェックを行うこと。
