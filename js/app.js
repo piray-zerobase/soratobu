@@ -8,6 +8,7 @@
 let VIEW = "landing";       // landing / login / signup / onboard / main
 let DTAB = "map";           // 医師タブ: map / date / my
 let SELDATE = null, DETAIL = null, selOut = 0, selRet = 0, map = null;
+let FILT = {type:"", area:""}; // 医師の絞り込み（マップ・日付タブ共通）
 let CHAT_AP = null;         // 開いているチャットの applicationId
 
 const $ = id => document.getElementById(id);
@@ -288,6 +289,35 @@ function renderHospitalPending(root,h){
 
 /* ---------- 医師メイン ---------- */
 function setDTab(t){ DTAB=t; DETAIL=null; render(); }
+const areaOf = h => h.island || h.pref;
+function openPostingsAll(){ return DB.postings.filter(p=>p.status==="open"); }
+function filteredOpenPostings(){
+  return openPostingsAll().filter(p=>{
+    if(FILT.type && p.type!==FILT.type) return false;
+    if(FILT.area){ const h=DB.hospitals.find(x=>x.id===p.hospitalId); if(!h||areaOf(h)!==FILT.area) return false; }
+    return true;
+  });
+}
+function renderFilterBar(){
+  const areas=[...new Set(openPostingsAll().map(p=>{const h=DB.hospitals.find(x=>x.id===p.hospitalId); return h&&areaOf(h);}).filter(Boolean))].sort();
+  const active = FILT.type || FILT.area;
+  return `<div class="filterbar">
+    <div class="opts">
+      <div class="pick sm ${!FILT.type?"on":""}" onclick="setFiltType('')">すべての業務</div>
+      ${W_TYPES.map(t=>`<div class="pick sm ${FILT.type===t[0]?"on":""}" onclick="setFiltType('${t[0]}')">${t[0]}</div>`).join("")}
+    </div>
+    <div class="filterrow">
+      <select class="inp sm" id="filt-area" onchange="setFiltArea(this.value)">
+        <option value="">エリア：すべて</option>
+        ${areas.map(a=>`<option value="${esc(a)}" ${FILT.area===a?"selected":""}>${esc(a)}</option>`).join("")}
+      </select>
+      ${active?`<button class="btn sm ghost" onclick="clearFilt()">絞り込み解除</button>`:""}
+    </div>
+  </div>`;
+}
+function setFiltType(t){ FILT.type=t; render(); }
+function setFiltArea(a){ FILT.area=a; render(); }
+function clearFilt(){ FILT={type:"",area:""}; render(); }
 function renderDoctor(root){
   const d=dr();
   const pend=d.status!=="承認";
@@ -301,15 +331,15 @@ function renderDoctor(root){
   </div><div id="dbody"></div>`;
   const b=$("dbody");
   if(DTAB==="map"){
-    b.innerHTML=`<div id="leafmap"></div>
+    b.innerHTML=`${renderFilterBar()}<div id="leafmap"></div>
       <div class="maplegend">🟢 点灯＝募集あり ／ 🔴 点滅＝緊急募集 ｜ ピンをタップ→募集一覧（給与は地図では非表示）</div>`;
     setTimeout(initMap,30);
   } else if(DTAB==="date"){
-    const open=DB.postings.filter(p=>p.status==="open");
+    const open=filteredOpenPostings();
     const dates=[...new Set(open.map(p=>p.date))].sort();
-    if(!dates.length){ b.innerHTML=`<div class="paneltitle">現在、公開中の募集はありません</div>`; return; }
+    if(!dates.length){ b.innerHTML=`${renderFilterBar()}<div class="paneltitle">${FILT.type||FILT.area?"条件に合う募集がありません":"現在、公開中の募集はありません"}</div>`; return; }
     if(!SELDATE||!dates.includes(SELDATE)) SELDATE=dates[0];
-    b.innerHTML=`<div class="datebar">${dates.map(dd=>`
+    b.innerHTML=`${renderFilterBar()}<div class="datebar">${dates.map(dd=>`
       <div class="dchip ${dd===SELDATE?"on":""}" onclick="SELDATE='${dd}';render()">
         <div class="m">${+dd.split("-")[1]}月</div><div class="d">${+dd.split("-")[2]}</div><div class="m">${dow(dd)}</div></div>`).join("")}
     </div>${open.filter(p=>p.date===SELDATE).map(cardHTML).join("")}`;
@@ -354,7 +384,7 @@ function initMap(){
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
     {maxZoom:12,minZoom:4,attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(map);
   const byH={};
-  DB.postings.filter(p=>p.status==="open").forEach(p=>{(byH[p.hospitalId]=byH[p.hospitalId]||[]).push(p);});
+  filteredOpenPostings().forEach(p=>{(byH[p.hospitalId]=byH[p.hospitalId]||[]).push(p);});
   Object.keys(byH).forEach(hid=>{
     const h=DB.hospitals.find(x=>x.id===hid);
     if(!h||h.lat==null) return;
@@ -367,7 +397,7 @@ function initMap(){
 }
 function hospSheet(hid){
   const h=DB.hospitals.find(x=>x.id===hid);
-  const list=DB.postings.filter(p=>p.status==="open"&&p.hospitalId===hid);
+  const list=filteredOpenPostings().filter(p=>p.hospitalId===hid);
   openModal(`<h3>📍 ${esc(h.island||h.pref)}｜${esc(h.name)}</h3>
     <div class="sub">${esc(h.address||"")}</div>
     ${list.map(cardHTML).join("")}

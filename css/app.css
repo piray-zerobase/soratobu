@@ -92,6 +92,14 @@ body{margin:0; font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans 
 @keyframes lit{0%,100%{box-shadow:0 0 0 4px rgba(10,125,140,.25),0 0 8px 2px rgba(10,125,140,.45);}
  50%{box-shadow:0 0 0 6px rgba(10,125,140,.14),0 0 14px 4px rgba(10,125,140,.6);}}
 
+/* filter bar (医師: マップ・日付タブ共通) */
+.filterbar{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 11px; margin-bottom:10px;}
+.filterbar .opts{margin-top:0;}
+.filterrow{display:flex; gap:8px; align-items:center; margin-top:8px;}
+.filterrow .inp.sm{width:auto; flex:1;}
+.pick.sm{padding:6px 10px; font-size:11.5px;}
+.inp.sm{padding:7px 10px; font-size:12.5px;}
+
 /* date chips */
 .datebar{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px;}
 .dchip{flex:0 0 auto; padding:9px 13px; border-radius:13px; background:#fff; border:1px solid var(--line); cursor:pointer; text-align:center;}

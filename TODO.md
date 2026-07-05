@@ -18,7 +18,7 @@
 - [x] **通知センター**：ヘッダーに🔔。自分宛イベント（手上げあり/承認された/見送り/メッセージ）を既読管理付きで一覧
 - [x] **病院の複数ユーザー**：HospitalUser相当（同じ病院に事務2人目を招待コードで追加）
 - [x] **募集テンプレ保存**：病院が「前回の募集をコピーして作成」できるように
-- [ ] **医師の絞り込み**：日付×業務種別×エリアのフィルタ（地図・日付タブ共通）
+- [x] **医師の絞り込み**：日付×業務種別×エリアのフィルタ（地図・日付タブ共通）
 - [ ] **キャンセルフロー**：確定後の取り下げ（理由必須・相手に通知・AuditLog記録）※ペナルティ設計はしない
 - [ ] **Supabaseアダプタ骨格**：js/store-supabase.js を新設（同じAPI関数名でsupabase-js呼び出しの雛形＋接続設定ファイルconfig.example.js）。※実接続はSupabaseプロジェクト作成後
 - [x] **単体テスト**：tests/store.test.mjs（node:testで状態遷移・資格ゲート・重複応募拒否を検証）＋実行方法をREADMEに
@@ -36,3 +36,4 @@
 - 2026-07-05 病院の複数ユーザー（HospitalUser相当）：②のデータ構造は変更せず、既存のUser（role=hospital, refId=hospitalId）が同じhospitalIdを指せる設計をそのまま利用。store.jsに病院ごとのinviteCode（8桁・紛らわしい文字除外のランダム生成、hospitals seed/registerHospital時に自動発行）と、api.joinHospitalByInviteCode(userId,code)（refId未設定のhospitalユーザーのみ参加可・二重所属や誤コードを拒否）／api.regenerateInviteCode(userId)（漏洩時の失効用）を追加。app.jsの病院オンボーディング画面に「招待コードで参加」タブを追加し、病院ダッシュボードに自院の招待コード表示・コピー・再発行ボタンを追加（css/app.cssに.invitecode追加）。docs/SECURITY_CHECKLIST.mdに招待コード機能の権限チェック観点を追記。tests/store.test.mjsに3テスト追加（正常参加・誤コード拒否/二重所属拒否・再発行と旧コード失効）、node --check全通過、node --test 15件（store 11 + seatAvailability 4）全通過
 - 2026-07-05 単体テスト：既存のtests/store.test.mjs（node:test、状態遷移・資格ゲート・重複応募拒否・権限チェック・招待コードを網羅、15件全通過）とREADMEの実行方法（node --test）記載により本項目の要件を満たしていたため、タスクとして[x]に反映（新規実装なし）
 - 2026-07-05 募集テンプレ保存：js/app.jsのopenWizard()にfromId引数を追加し、既存の募集（type/time/dept/pay/urgent/note）から募集ウィザードの初期値を復元できるように変更（日にちは新規入力必須のため空欄のまま）。openTemplatePicker()／useTemplate()を新設し、病院ダッシュボードに「📋 前回をコピー」ボタン（自院の過去募集がある場合のみ表示）から最新10件を選んで複製→公開できるようにした。②のデータ構造・store.jsのAPIは無変更（ビュー層のみの変更）。node --check全通過、node --test 15件全通過、Playwright（Chromiumヘッドレス）で実際にログイン→テンプレ選択→時間帯/業務/診療科/一言/報酬が復元されること→日にちのみ入力して公開→カレンダーに新規枠が反映されることを確認
+- 2026-07-05 医師の絞り込み：js/app.jsに医師タブ共通の絞り込み状態FILT（type/area）とrenderFilterBar()を追加し、マップ・日付タブの両方に「業務種別（すべて/当直/外来応援/健診応援/ワクチン）」チップと「エリア」セレクトを表示。filteredOpenPostings()で募集一覧・マップのピン集計（initMap）・ピンタップ時の一覧（hospSheet）を絞り込み条件で共通フィルタするよう変更（store.js・②データ構造は無変更、ビュー層のみ）。css/app.cssに.filterbar/.filterrow/.pick.sm/.inp.smを追加。node --check全通過、node --test 15件全通過、Playwright（Chromiumヘッドレス）で医師ログイン→日付タブでの業務種別フィルタによる件数変化・エリア候補の表示・「絞り込み解除」・マップタブへの切替後もフィルタバーが表示されることを確認
