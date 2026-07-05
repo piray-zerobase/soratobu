@@ -296,6 +296,15 @@ function cardHTML(p){
 }
 function openPosting(id){ closeModal(); DETAIL=id; selOut=0; selRet=0; render(); }
 
+// 便の候補(複数区間なら各区間)の空席状況をデモ表示用バッジにする
+function seatBadge(o, date){
+  const order={full:3, few:2, unknown:1, available:0};
+  const worst = o.legs.map(f=>seatAvailability(f.no, date))
+    .reduce((a,b)=> order[b.status]>order[a.status]?b:a);
+  const left = (worst.status!=="full" && worst.seatsLeft!=null) ? `(残${worst.seatsLeft})` : "";
+  return ` <span class="seatbadge ${worst.status}">${SEAT_STATUS_LABEL[worst.status]}${left}</span>`;
+}
+
 /* ---------- 募集詳細（医師） ---------- */
 function renderDetail(root){
   const p=DB.postings.find(x=>x.id===DETAIL);
@@ -318,14 +327,14 @@ function renderDetail(root){
   <div class="detbody">
     <div class="farebig">💴 交通費は <u>${esc(p.transport)}</u></div>
     ${outs?`
-      <div class="opt-h">🛫 行きの便（選べます）</div>
+      <div class="opt-h">🛫 行きの便（選べます）<span class="demo-tag">空席状況はデモデータ</span></div>
       ${outs.map((o,i)=>`<div class="opt ${i===selOut?"on":""}" onclick="selOut=${i};render()">
-        <div class="opt-f">✈ ${o.prevDay?"【前日】":""}${legStr(o)}${o.direct?' <span class="direct">🟢直行</span>':""}</div>
+        <div class="opt-f">✈ ${o.prevDay?"【前日】":""}${legStr(o)}${o.direct?' <span class="direct">🟢直行</span>':""}${seatBadge(o,p.date)}</div>
         <div class="opt-s">⏰ ${o.by}　→ ${o.arrive}</div></div>`).join("")}
       <div class="tl-work">🩺 勤務　${p.timeStart}〜${p.overnight?"翌":""}${p.timeEnd}</div>
-      <div class="opt-h">🛬 帰りの便（選べます）</div>
+      <div class="opt-h">🛬 帰りの便（選べます）<span class="demo-tag">空席状況はデモデータ</span></div>
       ${rets.map((o,i)=>`<div class="opt ${i===selRet?"on":""}" onclick="selRet=${i};render()">
-        <div class="opt-f">✈ ${p.overnight?"【翌日】":""}${legStr(o)}${o.direct?' <span class="direct">🟢直行</span>':""}</div>
+        <div class="opt-f">✈ ${p.overnight?"【翌日】":""}${legStr(o)}${o.direct?' <span class="direct">🟢直行</span>':""}${seatBadge(o,p.date)}</div>
         <div class="opt-s">🏠 ${o.home}</div></div>`).join("")}`
     :`<div class="notice">✈ この病院の便データは準備中です。<a href="${navitime}" target="_blank" rel="noopener">NAVITIMEで経路を確認する →</a></div>`}
     <div class="row"><div class="k">現地の足</div><div class="v">${esc(p.ground)}</div></div>

@@ -107,6 +107,11 @@ body{margin:0; font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans 
 .opt-f{font-size:12.5px; color:#2a4750; font-weight:700; line-height:1.5; padding-right:56px;}
 .opt-s{font-size:11.5px; color:#5c727b; margin-top:3px;}
 .direct{color:#1f9d6b; font-size:10.5px;}
+.demo-tag{font-size:10px; font-weight:700; color:#8a8a8a; background:#f0f0f0; padding:2px 7px; border-radius:6px; margin-left:8px; vertical-align:middle;}
+.seatbadge{display:inline-block; font-size:10px; font-weight:700; padding:1px 7px; border-radius:7px; margin-left:6px; vertical-align:middle;}
+.seatbadge.available{background:#e9f7ef; color:var(--ok);}
+.seatbadge.few{background:#fdf0e0; color:var(--warn);}
+.seatbadge.full,.seatbadge.unknown{background:#eee; color:#888;}
 .tl-work{background:#fdeee7; color:#c85a2b; font-weight:800; font-size:13px; border-radius:10px; padding:10px 12px; margin:10px 0; text-align:center;}
 .row{display:flex; gap:10px; padding:10px 2px; border-bottom:1px solid var(--line); font-size:13px;}
 .row .k{color:var(--sub); width:70px; flex:0 0 auto; font-size:12px;}
