@@ -55,13 +55,75 @@ function render(){
 }
 function renderHeader(){
   const u=auth.me();
+  const s=auth.session;
+  const showBell = s && s.refId && (s.role==="doctor"||s.role==="hospital");
+  const unread = showBell ? unreadNotifCount() : 0;
+  const bell = showBell
+    ? `<button class="hbtn bell" onclick="openNotifCenter()" aria-label="通知">🔔${unread?`<span class="nbadge">${unread>9?"9+":unread}</span>`:""}</button>` : "";
   $("hdr-right").innerHTML = u
-    ? `<span class="hdr-user">${esc(u.email)}（${{doctor:"医師",hospital:"病院",admin:"運営"}[u.role]}）</span>
+    ? `${bell}<span class="hdr-user">${esc(u.email)}（${{doctor:"医師",hospital:"病院",admin:"運営"}[u.role]}）</span>
        <button class="hbtn" onclick="doLogout()">ログアウト</button>`
     : `<button class="hbtn" onclick="go('login')">ログイン</button>
        <button class="hbtn solid" onclick="go('signup')">新規登録</button>`;
 }
 function doLogout(){ auth.logout(); go("landing"); }
+
+/* ---------- 通知センター（自分宛イベントを既読カーソル付きで一覧） ---------- */
+const seqOf = id => +((id||"").split("_")[1]||0);
+function notifEvents(role, refId){
+  const evs=[];
+  const short = t => t.length>22 ? t.slice(0,22)+"…" : t;
+  if(role==="doctor"){
+    DB.applications.filter(a=>a.doctorId===refId).forEach(a=>{
+      const po=DB.postings.find(p=>p.id===a.postingId); if(!po) return;
+      if(a.status==="approved") evs.push({seq:seqOf(a.id), icon:"✅",
+        text:`${hname(po.hospitalId)}／${dstr(po.date)} ${po.type} が承認されました`,
+        action:`closeModal();DTAB='my';go('main')`});
+      if(a.status==="declined") evs.push({seq:seqOf(a.id), icon:"🙏",
+        text:`${hname(po.hospitalId)}／${dstr(po.date)} ${po.type} は見送りになりました`,
+        action:`closeModal();DTAB='my';go('main')`});
+    });
+    DB.messages.forEach(m=>{
+      if(m.senderRole!=="hospital") return;
+      const ap=DB.applications.find(a=>a.id===m.applicationId);
+      if(!ap || ap.doctorId!==refId) return;
+      const po=DB.postings.find(p=>p.id===ap.postingId); if(!po) return;
+      evs.push({seq:seqOf(m.id), icon:"💬", text:`${hname(po.hospitalId)}：「${short(m.text)}」`, action:`openChat('${ap.id}')`});
+    });
+  } else if(role==="hospital"){
+    DB.postings.filter(p=>p.hospitalId===refId).forEach(po=>{
+      DB.applications.filter(a=>a.postingId===po.id && a.status==="applied").forEach(a=>{
+        evs.push({seq:seqOf(a.id), icon:"✋",
+          text:`${dname(a.doctorId)} 先生が ${dstr(po.date)} ${po.type} に手を挙げました`,
+          action:`closeModal();hospSlot('${po.id}')`});
+      });
+    });
+    DB.messages.forEach(m=>{
+      if(m.senderRole!=="doctor") return;
+      const ap=DB.applications.find(a=>a.id===m.applicationId); if(!ap) return;
+      const po=DB.postings.find(p=>p.id===ap.postingId);
+      if(!po || po.hospitalId!==refId) return;
+      evs.push({seq:seqOf(m.id), icon:"💬", text:`${dname(ap.doctorId)} 先生：「${short(m.text)}」`, action:`openChat('${ap.id}')`});
+    });
+  }
+  return evs.sort((a,b)=>b.seq-a.seq);
+}
+function unreadNotifCount(){
+  const s=auth.session; if(!s||!s.refId) return 0;
+  const cursor=(DB.notifCursor||{})[s.userId]||0;
+  return notifEvents(s.role, s.refId).filter(e=>e.seq>cursor).length;
+}
+function openNotifCenter(){
+  const s=auth.session; if(!s||!s.refId) return;
+  const cursor=(DB.notifCursor||{})[s.userId]||0;
+  const evs=notifEvents(s.role, s.refId).slice(0,30);
+  openModal(`<h3>🔔 通知</h3>
+    ${evs.length?evs.map(e=>`<div class="notifrow ${e.seq>cursor?"unread":""}" onclick="${e.action}">${e.icon} ${esc(e.text)}</div>`).join("")
+      :'<div class="paneltitle" style="text-align:center;">通知はまだありません</div>'}
+    <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
+  api.markNotificationsRead(s.userId);
+  renderHeader();
+}
 
 /* ---------- ランディング ---------- */
 function renderLanding(root){

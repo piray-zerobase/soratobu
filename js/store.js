@@ -24,6 +24,7 @@ function seedDB(){
     applications: [], assignments: [], messages: [],
     audit: [{ts:tsNow(), actor:"system", action:"seed", detail:"初期データ投入"}],
     seq: 100,
+    notifCursor: {},   // userId -> 既読済みのseq（通知センターの既読管理）
   };
   // マスタの離島病院のうち3院を「登録・承認済み」の病院としてシード
   const seedHosp = [
@@ -91,7 +92,13 @@ async function ensureSeedUsers(){
 }
 
 let DB = loadDB();
-function loadDB(){ try{ const s=localStorage.getItem(LSKEY); if(s) return JSON.parse(s);}catch(e){} return seedDB(); }
+function loadDB(){
+  let db;
+  try{ const s=localStorage.getItem(LSKEY); if(s) db=JSON.parse(s); }catch(e){}
+  if(!db) db=seedDB();
+  if(!db.notifCursor) db.notifCursor={};
+  return db;
+}
 function saveDB(){ localStorage.setItem(LSKEY, JSON.stringify(DB)); }
 function resetDB(){ DB = seedDB(); saveDB(); }
 function tsNow(){ const d=new Date(); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
@@ -328,6 +335,13 @@ const api = {
     if(!c) return {err:"確認中の書類がありません"};
     c.status = approveIt ? "承認" : "却下";
     audit("admin", "credential.verify", `${dr.name} ${type} → ${c.status}`);
+    saveDB(); return {ok:true};
+  },
+  /* 通知センター：本人以外は既読カーソルを進められない */
+  markNotificationsRead(userId){
+    const user = DB.users.find(u=>u.id===userId);
+    if(!user) return {err:"権限がありません"};
+    DB.notifCursor[userId] = DB.seq;
     saveDB(); return {ok:true};
   },
 };
