@@ -9,11 +9,13 @@
 ### 1. デプロイすれば実際に使える状態（複数ユーザーで同時利用できる）
 
 - 現状：v0.2はlocalStorageデモモード（1ブラウザ内で完結、複数人の同時利用は不可）
-- 必要な作業：
-  - [ ] ⏸人間待ち：Supabaseプロジェクトを作成し、接続情報（URL・anon key）を用意する
+- 実装：`js/store-supabase.js`（store.jsと同じ関数名でsupabase-jsのcreateClient・auth・rpc呼び出しの雛形）と`js/config.example.js`（接続設定の雛形）を追加。index.htmlは引き続き`js/store.js`を読み込んでおり、現行アプリの動作には影響しない。
+- 必要な作業（人間ゲート）：
+  - [ ] ⏸人間待ち：Supabaseプロジェクトを作成し、接続情報（URL・anon key）を用意する→`js/config.example.js`を`js/config.js`としてコピーして記入
   - [ ] `supabase/schema.sql` を実行してテーブルを作成する（⏸人間待ち：本番プロジェクトへの適用）
-  - [ ] `js/store.js` と同じAPI関数名でSupabase呼び出しをする`js/store-supabase.js`の雛形を用意する（TODO.md「Supabaseアダプタ骨格」タスク。実接続の切替は人間が確認の上で行う）
-- 状態：**未着手（骨格作成はエージェントで可能、実接続は人間ゲート）**
+  - [ ] `supabase/schema.sql`に未定義のRPC・カラムを追加する（招待コード関連、確定後キャンセル、通知既読カーソル。詳細は`js/store-supabase.js`内のTODOコメント参照）
+  - [ ] DB側RPC（security definer関数）で権限チェック・重複防止（ダブルブッキング）を再実装したうえで、index.htmlのscriptタグを`js/store.js`→`js/config.js`+`js/store-supabase.js`（+supabase-jsのCDN）に差し替え、動作確認する
+- 状態：**骨格（雛形）まで完了。実接続・DB側RPC実装・切替は人間ゲート**
 
 ### 2. 医師側・病院側のUXに問題がないこと
 
