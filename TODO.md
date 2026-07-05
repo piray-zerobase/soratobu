@@ -14,7 +14,7 @@
 - [x] **UX自己点検**：医師側・病院側の全フローを追って問題点を洗い出し・修正。docs/UX_CHECKLIST.mdに記録
 - [x] **空席照会アダプタ**：実際の空き状況を反映できるインターフェイス（seatAvailability(flightNo,date)）とモック実装。UIに「デモデータ」と明示。実API接続は人間ゲート
 - [x] **リリースチェックリスト作成**：docs/RELEASE_CHECKLIST.md（完了条件と人間ゲート＝Supabase接続情報／実API契約／弁護士確認を記載）
-- [ ] **入力バリデーション強化**：医籍番号・電話番号・日付の形式チェックをフォーム側にも（store.js側は既存）
+- [x] **入力バリデーション強化**：医籍番号・電話番号・日付の形式チェックをフォーム側にも（store.js側は既存）
 - [ ] **通知センター**：ヘッダーに🔔。自分宛イベント（手上げあり/承認された/見送り/メッセージ）を既読管理付きで一覧
 - [ ] **病院の複数ユーザー**：HospitalUser相当（同じ病院に事務2人目を招待コードで追加）
 - [ ] **募集テンプレ保存**：病院が「前回の募集をコピーして作成」できるように
@@ -31,3 +31,4 @@
 - 2026-07-05 セキュリティ自己点検：store.jsの全API関数を権限チェック観点で洗い出し、実際の不備4件（decline/completeの他院操作可能、sendMessageのなりすまし、verifyDoctor/verifyHospital/verifyCredentialのadmin権限未検証）を発見・修正。app.jsの呼び出し側とtests/store.test.mjsも追随（新規4テスト、計8件全通過）。XSS・セッション・データ露出は確認のうえ結果をdocs/SECURITY_CHECKLIST.mdに記録（本番Supabase移行時の再点検事項も明記）
 - 2026-07-05 UX自己点検：医師側・病院側の全画面遷移をapp.js/index.html/store.js/css/app.cssから追い、問題点を洗い出してdocs/UX_CHECKLIST.mdに記録。修正8件（承認/お断り/勤務完了への確認ダイアログ、募集ウィザードの報酬未入力バリデーション、チャット入力のIME誤送信防止、ログイン/登録ボタンの多重送信防止、必須項目の「＊必須」明示、label/inputのfor紐付け、トーストの折り返し対応）。取り下げ理由promptの見た目統一など4件は小規模修正の範囲を超えるため記録のみで見送り。node --check全通過、既存node --test 8件も全通過（store.js無変更）
 - 2026-07-05 空席照会アダプタ：js/seatAvailability.js を新設し、seatAvailability(flightNo,date)インターフェイスとモック実装（便名+日付から決定論的な疑似空席状況を返す）を追加。index.htmlで読み込み、募集詳細（app.js renderDetail）の行き・帰り便選択肢に空席バッジを表示し「空席状況はデモデータ」と明示（css/app.cssに.seatbadge/.demo-tag追加）。実API接続は関数シグネチャを変えずに中身を差し替える設計とし、人間ゲート（契約・接続情報）とした。tests/seatAvailability.test.mjsで決定論性・戻り値の形・unknown時の挙動を検証（4件、既存8件と合わせ計12件全通過）。あわせてdocs/RELEASE_CHECKLIST.mdを新設し、リリース6完了条件それぞれの状態・残タスク・人間ゲート一覧（Supabase接続情報／RLS再点検／弁護士確認／実API契約／公開判断）を記録
+- 2026-07-05 入力バリデーション強化：医籍登録番号（数字以外を入力時に自動除去＋5〜7桁チェックをdoRegisterDoctorに追加）・病院代表電話（type=telと数字/ハイフン以外の自動除去、isValidPhoneによる形式チェックを追加。未入力は引き続き任意）・募集ウィザードの日にち欄（数字以外を自動除去、Number.isIntegerで整数のみ許可するようwizNext/wizPublishを修正）をフォーム側にも実装。store.js側の権限チェック・重複防止ロジックは無変更。node --check全通過、既存node --test 12件も全通過

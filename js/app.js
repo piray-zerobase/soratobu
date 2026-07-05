@@ -16,6 +16,8 @@ const DOWJ = ["日","月","火","水","木","金","土"];
 const dstr = iso => { const p=iso.split("-"); return `${+p[1]}/${+p[2]}`; };
 const dow = iso => DOWJ[new Date(iso+"T00:00:00").getDay()];
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const isValidLicenseNo = s => /^\d{5,7}$/.test(s||"");
+const isValidPhone = s => /^0\d{9,10}$/.test((s||"").replace(/-/g,""));
 const dr = () => DB.doctors.find(d=>d.id===auth.session.refId);
 const hp = () => DB.hospitals.find(h=>h.id===auth.session.refId);
 const dname = id => (DB.doctors.find(d=>d.id===id)||{}).name || id;
@@ -137,7 +139,7 @@ function renderDoctorOnboard(root){
     <h2>医師プロフィール登録（初回のみ）</h2>
     <p class="authp">登録内容は運営が<b>厚生労働省「医師等資格確認検索」と照合し、実在する医師であることを確認</b>してから有効になります。閲覧は審査中でも可能ですが、手上げ（応募）は承認後に開放されます。</p>
     <label for="d-name">氏名（免許証と同一表記）<span class="req">＊必須</span></label><input class="inp" id="d-name">
-    <label for="d-lic">医籍登録番号（数字のみ）<span class="req">＊必須</span></label><input class="inp" id="d-lic" placeholder="例）123456">
+    <label for="d-lic">医籍登録番号（数字のみ）<span class="req">＊必須</span></label><input class="inp" id="d-lic" placeholder="例）123456" inputmode="numeric" maxlength="7" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     <label for="d-hoken">保険医登録票の登録番号（保険診療をする場合のみ・任意）</label><input class="inp" id="d-hoken" placeholder="未入力可">
     <label id="d-specs-label">診療科（複数可）<span class="req">＊必須</span></label><div class="opts" id="d-specs" role="group" aria-labelledby="d-specs-label">${SPECS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
     <label id="d-caps-label">対応できる業務（複数可）<span class="req">＊必須</span></label><div class="opts" id="d-caps" role="group" aria-labelledby="d-caps-label">${CAPS.map(s=>`<div class="pick" onclick="this.classList.toggle('on')">${s}</div>`).join("")}</div>
@@ -153,6 +155,7 @@ function doRegisterDoctor(){
   const specs=[...document.querySelectorAll("#d-specs .pick.on")].map(e=>e.textContent);
   const caps=[...document.querySelectorAll("#d-caps .pick.on")].map(e=>e.textContent);
   if(!$("d-name").value.trim()) return toast("⚠️ 氏名を入力してください");
+  if(!isValidLicenseNo($("d-lic").value.trim())) return toast("⚠️ 医籍登録番号は5〜7桁の数字で入力してください");
   if(!specs.length||!caps.length) return toast("⚠️ 診療科と対応業務を選んでください");
   if(!$("d-file1").files.length||!$("d-file2").files.length) return toast("⚠️ 免許証と本人確認書類を添付してください");
   const r=api.registerDoctor(auth.session.userId,{
@@ -174,12 +177,14 @@ function renderHospitalOnboard(root){
     <select class="inp" id="h-pref">${PREFS.map(p=>`<option>${p}</option>`).join("")}</select>
     <label for="h-name">病院名（正式名称）<span class="req">＊必須</span></label><input class="inp" id="h-name" placeholder="例）徳之島徳洲会病院">
     <label for="h-addr">住所<span class="req">＊必須</span></label><input class="inp" id="h-addr" placeholder="例）鹿児島県大島郡徳之島町亀津7588">
-    <label for="h-tel">代表電話（任意）</label><input class="inp" id="h-tel" placeholder="例）0997-83-1100">
+    <label for="h-tel">代表電話（任意）</label><input class="inp" id="h-tel" type="tel" placeholder="例）0997-83-1100" oninput="this.value=this.value.replace(/[^0-9\-]/g,'')">
     <label for="h-fac">受け入れ体制メモ（任意）</label><input class="inp" id="h-fac" placeholder="例）送迎あり・宿は病院手配・電子カルテあり">
     <button class="btn prim" style="width:100%;margin-top:16px;" onclick="doRegisterHospital()">登録して実在確認を受ける</button>
   </div>`;
 }
 function doRegisterHospital(){
+  const tel=$("h-tel").value.trim();
+  if(tel && !isValidPhone(tel)) return toast("⚠️ 電話番号の形式が正しくありません（例：0997-83-1100）");
   const r=api.registerHospital(auth.session.userId,{
     pref:$("h-pref").value, name:$("h-name").value.trim(), address:$("h-addr").value.trim(),
     phone:$("h-tel").value.trim(), facilities:$("h-fac").value.trim()});
@@ -511,7 +516,7 @@ function openWizard(){ wiz={step:0,day:"",ti:0,ty:0,dept:"内科",pay:"120000",u
 function drawWiz(){
   const s=wiz.step; let body="";
   if(s===0) body=`<div class="q">① いつ来てほしい？（2026年7月の日にち）</div>
-    <input class="inp" id="w-day" placeholder="例）18" value="${wiz.day}" oninput="wiz.day=this.value">
+    <input class="inp" id="w-day" placeholder="例）18" value="${wiz.day}" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'');wiz.day=this.value">
     <div class="q">時間帯</div><div class="opts">${W_TIMES.map((t,i)=>`
       <div class="pick ${wiz.ti===i?"on":""}" onclick="wiz.ti=${i};drawWiz()">${t[0]}〜${t[2]?"翌":""}${t[1]}</div>`).join("")}</div>`;
   else if(s===1) body=`<div class="q">② 何の業務？</div><div class="opts">${W_TYPES.map((t,i)=>`
@@ -538,12 +543,12 @@ function drawWiz(){
     </div>`);
 }
 function wizNext(){
-  if(wiz.step===0&&!(+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");return;}
+  if(wiz.step===0&&!(Number.isInteger(+wiz.day)&&+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");return;}
   if(wiz.step===2&&!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");return;}
   wiz.step++; drawWiz();
 }
 function wizPublish(){
-  if(!(+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");wiz.step=0;drawWiz();return;}
+  if(!(Number.isInteger(+wiz.day)&&+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");wiz.step=0;drawWiz();return;}
   if(!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");wiz.step=2;drawWiz();return;}
   const t=W_TIMES[wiz.ti];
   const r=api.publishPosting(hp().id,{date:`2026-07-${String(+wiz.day).padStart(2,"0")}`,
