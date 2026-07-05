@@ -231,9 +231,15 @@ function doRegisterDoctor(){
 
 /* ---------- 病院オンボーディング ---------- */
 function renderHospitalOnboard(root){
+  const mode = window._hospOnboardMode || "register";
   root.innerHTML=`
   <div class="authbox wide">
     <h2>病院情報の登録（初回のみ）</h2>
+    <div class="opts">
+      <div class="pick ${mode==="register"?"on":""}" onclick="setHospOnboardMode('register')">🏥 病院として新規登録</div>
+      <div class="pick ${mode==="join"?"on":""}" onclick="setHospOnboardMode('join')">🔑 招待コードで参加</div>
+    </div>
+    ${mode==="register" ? `
     <p class="authp">入力された病院名・住所は<b>実在病院マスタと自動照合</b>します。一致すればすぐに利用開始できます。一致しない場合は、運営が医療情報ネット（厚労省）等で実在を確認してから承認します。</p>
     <label for="h-pref">都道府県</label>
     <select class="inp" id="h-pref">${PREFS.map(p=>`<option>${p}</option>`).join("")}</select>
@@ -242,7 +248,22 @@ function renderHospitalOnboard(root){
     <label for="h-tel">代表電話（任意）</label><input class="inp" id="h-tel" type="tel" placeholder="例）0997-83-1100" oninput="this.value=this.value.replace(/[^0-9\-]/g,'')">
     <label for="h-fac">受け入れ体制メモ（任意）</label><input class="inp" id="h-fac" placeholder="例）送迎あり・宿は病院手配・電子カルテあり">
     <button class="btn prim" style="width:100%;margin-top:16px;" onclick="doRegisterHospital()">登録して実在確認を受ける</button>
+    ` : `
+    <p class="authp">同じ病院のご担当者からすでにアカウントがある場合は、共有された<b>招待コード</b>を入力するとその病院の担当者として利用を開始できます（病院を新しく登録する必要はありません）。</p>
+    <label for="h-code">招待コード<span class="req">＊必須</span></label><input class="inp" id="h-code" placeholder="例）AB2C3D4E" style="text-transform:uppercase;letter-spacing:2px;">
+    <button class="btn prim" style="width:100%;margin-top:16px;" onclick="doJoinHospitalByCode()">このコードで参加する</button>
+    `}
   </div>`;
+}
+function setHospOnboardMode(m){ window._hospOnboardMode=m; render(); }
+function doJoinHospitalByCode(){
+  const code=$("h-code").value.trim();
+  if(!code) return toast("⚠️ 招待コードを入力してください");
+  const r=api.joinHospitalByInviteCode(auth.session.userId, code);
+  if(r.err) return toast("⚠️ "+r.err);
+  window._hospOnboardMode=null;
+  toast(`${r.hospitalName} の担当者として参加しました`);
+  render();
 }
 function doRegisterHospital(){
   const tel=$("h-tel").value.trim();
@@ -506,6 +527,10 @@ function renderHospital(root){
   root.innerHTML=`
   <div class="paneltitle">🏥 <b>${esc(h.name)}</b>（✓ ${esc(h.verifiedNote)}）
     <button class="btn sm teal" style="margin-left:10px;" onclick="openWizard()">＋ 新規募集（3分）</button></div>
+  <div class="paneltitle">🔑 招待コード：<code class="invitecode">${esc(h.inviteCode)}</code>
+    <button class="btn sm ghost" onclick="copyInviteCode('${esc(h.inviteCode)}')">コピー</button>
+    <button class="btn sm ghost" onclick="doRegenInviteCode()">再発行</button>
+    ／同じ病院の別の担当者を追加するときに共有してください（漏れた場合は再発行してください）</div>
   ${inbox?`<div class="notice">🔔 <b>依頼あり：${inbox}件の手上げ</b>が承認待ちです。🟡の枠をクリックして確認してください。</div>`:""}
   <div class="notice" style="background:#fff;">🟡 募集中（クリック=応募確認）／🟢 確保済み／⚪ 完了｜2026年7月</div>
   <div class="cal">
@@ -569,6 +594,19 @@ function doApprove(apId){
 function doDecline(apId){
   if(!confirm("この先生をお断りしますか？\nこの操作は取り消せません。")) return;
   const r=api.decline(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("お断りしました");
+}
+function copyInviteCode(code){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(()=>toast("招待コードをコピーしました")).catch(()=>toast("コピーできませんでした。コード："+code));
+  } else {
+    toast("コード："+code);
+  }
+}
+function doRegenInviteCode(){
+  if(!confirm("招待コードを再発行しますか？\n古いコードはこの操作後、参加に使えなくなります。")) return;
+  const r=api.regenerateInviteCode(auth.session.userId);
+  if(r.err) return toast("⚠️ "+r.err);
+  render(); toast("招待コードを再発行しました");
 }
 function doComplete(asgId){
   if(!confirm("この勤務を完了にしますか？\n完了後は取り消せません。")) return;

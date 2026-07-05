@@ -17,6 +17,14 @@ async function hashPass(pass, salt){
 }
 const genSalt = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36);
 
+/* ---------- 招待コード（病院の複数ユーザー用。紛らわしい文字は除外） ---------- */
+const INVITE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function genInviteCode(){
+  let s = "";
+  for(let i=0;i<8;i++) s += INVITE_CHARS[Math.floor(Math.random()*INVITE_CHARS.length)];
+  return s;
+}
+
 /* ---------- 初期データ ---------- */
 function seedDB(){
   const db = {
@@ -38,7 +46,7 @@ function seedDB(){
       id:"hp_"+(i+1), name:m.name, pref:m.pref, city:m.city, address:`${m.pref}${m.city}（住所は登録時に入力）`,
       lat:m.lat, lng:m.lng, island:m.island||null, airport:m.airport||null, kind:m.kind,
       phone:"", status:"承認", verifiedNote:"病院マスタ一致（システム照合）",
-      facilities:"送迎あり・宿は病院手配",
+      facilities:"送迎あり・宿は病院手配", inviteCode:genInviteCode(),
     });
   });
   // デモ医師（承認済み）
@@ -204,7 +212,7 @@ const api = {
     DB.hospitals.push({
       id, name:prof.name, pref:prof.pref, city:m?m.city:"", address:prof.address, phone:prof.phone||"",
       lat:m?m.lat:null, lng:m?m.lng:null, island:m?(m.island||null):null, airport:m?(m.airport||null):null,
-      kind:m?m.kind:"", facilities:prof.facilities||"",
+      kind:m?m.kind:"", facilities:prof.facilities||"", inviteCode:genInviteCode(),
       status: m ? "承認" : "審査中",
       verifiedNote: m ? "病院マスタ一致（システム照合で実在確認）" : "マスタ不一致 → 運営が医療情報ネット等で目視確認",
     });
@@ -212,6 +220,29 @@ const api = {
     audit(m?"system":"hospital:"+id, "hospital.register",
       `${prof.name}（${prof.pref}）→ ${m?"マスタ一致・自動承認":"実在確認キューへ"}`);
     saveDB(); return {ok:true, id, matched:!!m};
+  },
+  /* 病院の複数ユーザー：招待コードで同じ病院に参加（事務2人目以降を追加） */
+  joinHospitalByInviteCode(userId, code){
+    const user = DB.users.find(u=>u.id===userId);
+    if(!user || user.role!=="hospital") return {err:"権限がありません"};
+    if(user.refId) return {err:"すでにいずれかの病院に所属しています"};
+    const c = (code||"").trim().toUpperCase();
+    if(!c) return {err:"招待コードを入力してください"};
+    const h = DB.hospitals.find(x=>x.inviteCode===c);
+    if(!h) return {err:"招待コードが正しくありません"};
+    user.refId = h.id; auth.session.refId = h.id; persistSession();
+    audit(`hospital:${h.id}`, "hospital.inviteJoin", `${user.email} が招待コードで参加`);
+    saveDB(); return {ok:true, hospitalId:h.id, hospitalName:h.name};
+  },
+  /* 招待コードの再発行（漏洩時などに現在のコードを失効させる） */
+  regenerateInviteCode(userId){
+    const user = DB.users.find(u=>u.id===userId);
+    if(!user || user.role!=="hospital" || !user.refId) return {err:"権限がありません"};
+    const h = DB.hospitals.find(x=>x.id===user.refId);
+    if(!h) return {err:"権限がありません"};
+    h.inviteCode = genInviteCode();
+    audit(`hospital:${h.id}`, "hospital.inviteRegenerate", `${user.email} が招待コードを再発行`);
+    saveDB(); return {ok:true, inviteCode:h.inviteCode};
   },
   /* 募集の公開 */
   publishPosting(hospitalId, p){

@@ -47,6 +47,7 @@ body{margin:0; font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans 
 /* common ui */
 .paneltitle{font-size:13px; color:var(--sub); margin:6px 2px 10px; line-height:1.7;}
 .paneltitle b{color:var(--teal-d);}
+.invitecode{font-family:ui-monospace,Menlo,monospace; font-weight:800; letter-spacing:2px; background:#eef6f8; border:1px solid #d5e8ec; border-radius:7px; padding:2px 8px; color:var(--teal-d);}
 .backlink{color:var(--teal-d); font-weight:800; cursor:pointer;}
 .section-h{font-weight:800; font-size:14px; color:var(--teal-d); margin:18px 2px 8px;}
 .notice{background:#eef6f8; border:1px solid #d5e8ec; border-radius:12px; padding:11px 13px; font-size:12.5px; color:#2a5560; line-height:1.7; margin-bottom:10px;}
