@@ -1,0 +1,15 @@
+{
+  "name": "そらとぶ医局",
+  "short_name": "そらとぶ医局",
+  "description": "離島・僻地のスポット医師募集と医師をつなぐ会員制プラットフォーム",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f4",
+  "theme_color": "#076270",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
