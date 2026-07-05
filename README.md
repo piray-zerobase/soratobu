@@ -54,6 +54,14 @@ gh api repos/{owner}/soratobu/pages -X POST -f 'source[branch]=main' -f 'source[
 4. **法務**：弁護士確認（α案スキーム）＋**特定募集情報等提供事業者の届出**＋利用規約
 5. 通知（メール→LINE検討）、便マスタの季節ダイヤ更新運用
 
+## テスト
+
+`js/store.js`（状態遷移・ダブルブッキング防止など）の単体テストは `tests/` にあります。
+
+```bash
+node --test
+```
+
 ## 運用ルール（制度として）
 
 - 運営（ゼロベース）がやること：実在確認（病院・医師・書類）、AuditLog監査、便マスタ更新

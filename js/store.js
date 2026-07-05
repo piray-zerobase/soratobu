@@ -136,6 +136,35 @@ function restoreSession(){
   try{ const s=sessionStorage.getItem("soratobu_session"); if(s) auth.session=JSON.parse(s); }catch(e){}
 }
 
+/* ---------- 日時重複チェック（ダブルブッキング防止） ----------
+   同一医師が同じ日時帯の別の予定（応募中 or 確定済み）を持っている場合はブロックする。
+   応募時・承認時の両方で検証する（承認時の再検証で、応募後に生じた重複も防ぐ）。 */
+function postingRange(po){
+  const [y,mo,d] = po.date.split("-").map(Number);
+  const [sh,sm] = po.timeStart.split(":").map(Number);
+  const start = new Date(y, mo-1, d, sh, sm).getTime();
+  const [eh,em] = po.timeEnd.split(":").map(Number);
+  const end = new Date(y, mo-1, d + (po.overnight?1:0), eh, em).getTime();
+  return {start, end};
+}
+function rangesOverlap(a, b){ return a.start < b.end && b.start < a.end; }
+function findScheduleConflict(doctorId, targetPo, excludeApplicationId){
+  const range = postingRange(targetPo);
+  const busyPostingIds = new Set();
+  DB.applications.forEach(a=>{
+    if(a.doctorId===doctorId && a.status==="applied" && a.id!==excludeApplicationId) busyPostingIds.add(a.postingId);
+  });
+  DB.assignments.forEach(a=>{
+    if(a.doctorId===doctorId && a.status==="confirmed") busyPostingIds.add(a.postingId);
+  });
+  busyPostingIds.delete(targetPo.id);
+  for(const pid of busyPostingIds){
+    const other = DB.postings.find(p=>p.id===pid);
+    if(other && rangesOverlap(range, postingRange(other))) return other;
+  }
+  return null;
+}
+
 /* ---------- 業務API（状態遷移＋Audit一元化） ---------- */
 const api = {
   /* 医師プロフィール登録（→ 書類は「確認中」で審査キューへ） */
@@ -194,6 +223,8 @@ const api = {
     if(!dr) return {err:"医師プロフィールが未登録です"};
     if(DB.applications.some(a=>a.postingId===postingId && a.doctorId===doctorId && a.status==="applied"))
       return {err:"すでに手を挙げています"};
+    const conflict = findScheduleConflict(doctorId, po, null);
+    if(conflict) return {err:`同じ日時に他の予定（${conflict.date} ${conflict.type}）があるため応募できません`};
     const ok = (po.requiredCredentials||[]).every(rc=>dr.credentials.some(c=>c.type===rc && c.status==="承認"));
     if(!ok) return {err:"必要資格が未承認のため応募できません"};
     const id = "ap_"+(DB.seq++);
@@ -206,6 +237,9 @@ const api = {
     if(!ap || ap.status!=="applied") return {err:"承認できない状態です"};
     const po = DB.postings.find(p=>p.id===ap.postingId);
     if(po.hospitalId!==hospitalId) return {err:"自院の募集ではありません"};
+    if(po.status!=="open") return {err:"この募集はすでに確定・終了しています"};
+    const conflict = findScheduleConflict(ap.doctorId, po, ap.id);
+    if(conflict) return {err:`医師の同日時の予定（${conflict.date} ${conflict.type}）と重複するため承認できません`};
     ap.status = "approved";
     DB.applications.filter(a=>a.postingId===po.id && a.id!==ap.id && a.status==="applied")
       .forEach(a=>{ a.status="declined"; audit("system","application.autoDecline",`${a.id}（他候補確定のため）`); });

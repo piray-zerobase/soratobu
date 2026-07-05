@@ -9,6 +9,11 @@
 
 ## タスクキュー（優先順）
 - [x] **PWA化**：manifest.json＋Service Worker（オフライン時は「接続してください」表示）。ホーム画面に追加できるように
+- [x] **ダブルブッキング完全防止**：同一医師の同日時重複応募/重複承認をstore.jsでブロック（承認時にも再検証）、1募集1医師の強制、テスト付き
+- [ ] **セキュリティ自己点検と修正**：XSS（全出力のesc確認）/権限チェック/セッション取り扱い/データ露出。結果をdocs/SECURITY_CHECKLIST.mdに記録
+- [ ] **UX自己点検**：医師側・病院側の全フローを追って問題点を洗い出し・修正。docs/UX_CHECKLIST.mdに記録
+- [ ] **空席照会アダプタ**：実際の空き状況を反映できるインターフェイス（seatAvailability(flightNo,date)）とモック実装。UIに「デモデータ」と明示。実API接続は人間ゲート
+- [ ] **リリースチェックリスト作成**：docs/RELEASE_CHECKLIST.md（完了条件と人間ゲート＝Supabase接続情報／実API契約／弁護士確認を記載）
 - [ ] **入力バリデーション強化**：医籍番号・電話番号・日付の形式チェックをフォーム側にも（store.js側は既存）
 - [ ] **通知センター**：ヘッダーに🔔。自分宛イベント（手上げあり/承認された/見送り/メッセージ）を既読管理付きで一覧
 - [ ] **病院の複数ユーザー**：HospitalUser相当（同じ病院に事務2人目を招待コードで追加）
@@ -22,3 +27,4 @@
 ## 作業ログ
 - 2026-06-21 v0.2 初回コミット（認証・実在確認・募集/手上げ/承認/チャット・病院マスタ67院）
 - 2026-07-05 PWA化：manifest.json・sw.js（アプリシェルをキャッシュ、オフライン時はoffline.htmlで「接続してください」表示）・icons/icon.svgを追加。index.htmlにmanifestリンクとSW登録を追加
+- 2026-07-05 ダブルブッキング完全防止：store.jsにfindScheduleConflict()を追加し、同一医師の同日時重複を手上げ時（apply）・承認時（approve、再検証として）の両方でブロック。承認時にpo.status!=="open"チェックも追加し1募集1医師を明示的に強制。tests/store.test.mjs（node:test）とtests/helpers/loadStore.mjs（vm上でmaster.js+store.jsを読み込むテスト用ハーネス）を新設、5件のテストで検証。READMEにテスト実行方法（node --test）を追記
