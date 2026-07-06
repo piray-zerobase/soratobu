@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>そらとぶ医局 — Supabase接続テスト</title>
+<style>
+  body{font-family:-apple-system,"Hiragino Kaku Gothic ProN",sans-serif; max-width:640px; margin:0 auto;
+    padding:24px 16px 60px; color:#15303a; background:#eef2f4;}
+  h1{font-size:19px; color:#076270;} h2{font-size:14px; color:#076270; margin:22px 0 8px;}
+  .box{background:#fff; border:1px solid #e6edf0; border-radius:12px; padding:14px; margin-bottom:12px;}
+  input,select{width:100%; box-sizing:border-box; border:1.5px solid #e6edf0; border-radius:9px; padding:9px 11px;
+    font-size:14px; margin:4px 0 8px; font-family:inherit;}
+  button{background:#0a7d8c; color:#fff; border:0; border-radius:9px; padding:10px 16px; font-weight:800;
+    font-size:13px; cursor:pointer; margin-right:6px; font-family:inherit;}
+  button.orange{background:#e8743b;}
+  #log{background:#15303a; color:#c8e6ec; font-family:ui-monospace,Menlo,monospace; font-size:12px;
+    border-radius:12px; padding:12px; min-height:180px; white-space:pre-wrap; line-height:1.6;}
+  .ok{color:#7be3a8;} .ng{color:#ff9d8a;}
+  .note{font-size:11.5px; color:#5c727b; line-height:1.7;}
+</style>
+</head>
+<body>
+<h1>🔌 Supabase接続テスト（本番の金庫室の動作確認）</h1>
+<p class="note">このページはクラウドのデータベースに<b>本当に</b>読み書きします。テスト用のメールアドレス（実在しなくてOK・例 test-doctor1@example.com）で試してください。</p>
+
+<div class="box">
+  <h2 style="margin-top:0;">① 接続チェック</h2>
+  <button onclick="t_conn()">接続を確認する</button>
+</div>
+
+<div class="box">
+  <h2 style="margin-top:0;">② 新規登録 → ③ ログイン</h2>
+  <input id="email" placeholder="メール（例 test-doctor1@example.com）">
+  <input id="pass" type="password" placeholder="パスワード（8文字以上）">
+  <select id="role"><option value="doctor">医師</option><option value="hospital">病院</option></select>
+  <button onclick="t_signup()">新規登録</button>
+  <button onclick="t_login()">ログイン</button>
+  <button onclick="t_profile()">プロフィール取得</button>
+</div>
+
+<div class="box">
+  <h2 style="margin-top:0;">④ 医師プロフィール登録（RPCテスト）</h2>
+  <input id="dname" placeholder="氏名（例 テスト 太郎）">
+  <input id="dlic" placeholder="医籍登録番号（例 123456）">
+  <button onclick="t_regdoc()">医師として登録（審査中になる）</button>
+</div>
+
+<div class="box">
+  <h2 style="margin-top:0;">⑤ 読み取り（RLS越しの見え方）</h2>
+  <button onclick="t_read()">hospitals / postings を読む</button>
+</div>
+
+<h2>ログ</h2>
+<div id="log">ここに結果が表示されます。①から順にどうぞ。</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store-supabase.js"></script>
+<script>
+const L=document.getElementById("log");
+function log(msg, cls){ L.innerHTML += `\n<span class="${cls||""}">${msg}</span>`; L.scrollTop=L.scrollHeight; }
+const val=id=>document.getElementById(id).value.trim();
+
+async function t_conn(){
+  try{
+    const r = await fetchOpenPostings();
+    if(r.err) return log("❌ 接続エラー: "+r.err, "ng");
+    log(`✅ 接続OK！ 公開中の募集: ${r.data.length}件（まだ0件で正常）`, "ok");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_signup(){
+  try{
+    const r = await auth.signup(val("email"), val("pass"), val("role") );
+    if(r.err) return log("❌ 登録失敗: "+r.err, "ng");
+    log(`✅ アカウント作成OK（${val("email")} / ${val("role")}）→ クラウドのAuthに実在します`, "ok");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_login(){
+  try{
+    const r = await auth.login(val("email"), val("pass"));
+    if(r.err) return log("❌ ログイン失敗: "+r.err, "ng");
+    log(`✅ ログインOK。session = ${JSON.stringify(auth.session)}`, "ok");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_profile(){
+  try{
+    const { data, error } = await sbClient.rpc("get_my_profile");
+    if(error) return log("❌ "+error.message, "ng");
+    log("✅ get_my_profile → "+JSON.stringify(data), "ok");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_regdoc(){
+  try{
+    const r = await api.registerDoctor(null, {
+      name: val("dname")||"テスト 太郎", licenseNo: val("dlic")||"123456", hokeniNo:"",
+      specialties:["内科"], capabilities:["当直"], homeBase:"ITM",
+    });
+    if(r.err) return log("❌ 医師登録失敗: "+r.err, "ng");
+    log(`✅ 医師登録OK（審査中で作成・doctorId=${r.data}）。もう一度押すと「登録済み」で弾かれれば、DB側ルールも効いています`, "ok");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_read(){
+  try{
+    const h = await sbClient.from("hospitals").select("id,name,status");
+    const p = await fetchOpenPostings();
+    log(`✅ hospitals: ${ (h.data||[]).length }件 ／ open postings: ${ (p.data||[]).length }件`, "ok");
+    log(`   ※RLS越しなので「自分に見えてよいもの」だけが返ります`, "");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+</script>
+</body>
+</html>
