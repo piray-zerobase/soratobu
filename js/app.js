@@ -302,16 +302,16 @@ function renderHospitalPending(root,h){
 /* ---------- 医師メイン ---------- */
 function setDTab(t){ DTAB=t; DETAIL=null; render(); }
 const areaOf = h => h.island || h.pref;
-function openPostingsAll(){ return DB.postings.filter(p=>p.status==="open"); }
+function openPostingsAll(){ return listOpenPostings(); }
 function filteredOpenPostings(){
   return openPostingsAll().filter(p=>{
     if(FILT.type && p.type!==FILT.type) return false;
-    if(FILT.area){ const h=DB.hospitals.find(x=>x.id===p.hospitalId); if(!h||areaOf(h)!==FILT.area) return false; }
+    if(FILT.area){ const h=getHospital(p.hospitalId); if(!h||areaOf(h)!==FILT.area) return false; }
     return true;
   });
 }
 function renderFilterBar(){
-  const areas=[...new Set(openPostingsAll().map(p=>{const h=DB.hospitals.find(x=>x.id===p.hospitalId); return h&&areaOf(h);}).filter(Boolean))].sort();
+  const areas=[...new Set(openPostingsAll().map(p=>{const h=getHospital(p.hospitalId); return h&&areaOf(h);}).filter(Boolean))].sort();
   const active = FILT.type || FILT.area;
   return `<div class="filterbar">
     <div class="opts">
@@ -403,7 +403,7 @@ function initMap(){
   const byH={};
   filteredOpenPostings().forEach(p=>{(byH[p.hospitalId]=byH[p.hospitalId]||[]).push(p);});
   Object.keys(byH).forEach(hid=>{
-    const h=DB.hospitals.find(x=>x.id===hid);
+    const h=getHospital(hid);
     if(!h||h.lat==null) return;
     const urgent=byH[hid].some(p=>p.urgent);
     const icon=L.divIcon({className:"",iconSize:[90,44],iconAnchor:[45,22],
@@ -413,7 +413,7 @@ function initMap(){
   });
 }
 function hospSheet(hid){
-  const h=DB.hospitals.find(x=>x.id===hid);
+  const h=getHospital(hid);
   const list=filteredOpenPostings().filter(p=>p.hospitalId===hid);
   openModal(`<h3>📍 ${esc(h.island||h.pref)}｜${esc(h.name)}</h3>
     <div class="sub">${esc(h.address||"")}</div>
@@ -421,7 +421,7 @@ function hospSheet(hid){
     <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
 }
 function cardHTML(p){
-  const h=DB.hospitals.find(x=>x.id===p.hospitalId);
+  const h=getHospital(p.hospitalId);
   return `<div class="card click" onclick="openPosting('${p.id}')">
     <div class="top"><div><div class="hosp">${esc(h.name)}</div>
     <div class="isl">📍 ${esc(h.island||h.pref)}・${dstr(p.date)}(${dow(p.date)})</div></div><div class="pay">${yen(p.pay)}</div></div>
@@ -442,8 +442,8 @@ function seatBadge(o, date){
 
 /* ---------- 募集詳細（医師） ---------- */
 function renderDetail(root){
-  const p=DB.postings.find(x=>x.id===DETAIL);
-  const h=DB.hospitals.find(x=>x.id===p.hospitalId);
+  const p=getPosting(DETAIL);
+  const h=getHospital(p.hospitalId);
   const d=dr();
   const missing=(p.requiredCredentials||[]).filter(rc=>!d.credentials.some(c=>c.type===rc&&c.status==="承認"));
   const notVerified=d.status!=="承認";
@@ -483,8 +483,8 @@ function renderDetail(root){
   </div>`;
 }
 function confirmApply(){
-  const p=DB.postings.find(x=>x.id===DETAIL);
-  const h=DB.hospitals.find(x=>x.id===p.hospitalId);
+  const p=getPosting(DETAIL);
+  const h=getHospital(p.hospitalId);
   const outs=outboundOptions(p,h), rets=returnOptions(p,h);
   const o=outs?outs[selOut]:null, r=rets?rets[selRet]:null;
   openModal(`<h3>最終確認</h3><div class="sub">確定後、選んだ便はご自身で予約します（費用は病院負担）</div>
@@ -501,8 +501,8 @@ function confirmApply(){
     <button class="btn green" onclick="doApply()">この内容で手を挙げる ✋</button></div>`);
 }
 function doApply(){
-  const p=DB.postings.find(x=>x.id===DETAIL);
-  const h=DB.hospitals.find(x=>x.id===p.hospitalId);
+  const p=getPosting(DETAIL);
+  const h=getHospital(p.hospitalId);
   const outs=outboundOptions(p,h), rets=returnOptions(p,h);
   const o=outs?outs[selOut]:null, r=rets?rets[selRet]:null;
   const itin = o&&r

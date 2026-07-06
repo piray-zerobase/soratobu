@@ -180,6 +180,12 @@ function findScheduleConflict(doctorId, targetPo, excludeApplicationId){
   return null;
 }
 
+/* ---------- 読み取りAPI（ビューはDBを直接参照せずこちらを使う） ----------
+   Supabase切替時にfetch呼び出しへ差し替えるための下準備。挙動はDB直参照と完全に同一。 */
+function listOpenPostings(){ return DB.postings.filter(p=>p.status==="open"); }
+function getPosting(id){ return DB.postings.find(p=>p.id===id); }
+function getHospital(id){ return DB.hospitals.find(h=>h.id===id); }
+
 /* ---------- 業務API（状態遷移＋Audit一元化） ---------- */
 const api = {
   /* 医師プロフィール登録（→ 書類は「確認中」で審査キューへ） */
