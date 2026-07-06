@@ -10,12 +10,13 @@
 
 - 現状：v0.2はlocalStorageデモモード（1ブラウザ内で完結、複数人の同時利用は不可）
 - 実装：`js/store-supabase.js`（store.jsと同じ関数名でsupabase-jsのcreateClient・auth・rpc呼び出しの雛形）と`js/config.example.js`（接続設定の雛形）を追加。index.htmlは引き続き`js/store.js`を読み込んでおり、現行アプリの動作には影響しない。
-- 必要な作業（人間ゲート）：
-  - [ ] ⏸人間待ち：Supabaseプロジェクトを作成し、接続情報（URL・anon key）を用意する→`js/config.example.js`を`js/config.js`としてコピーして記入
-  - [ ] `supabase/schema.sql` を実行してテーブルを作成する（⏸人間待ち：本番プロジェクトへの適用）
-  - [ ] `supabase/schema.sql`に未定義のRPC・カラムを追加する（招待コード関連、確定後キャンセル、通知既読カーソル。詳細は`js/store-supabase.js`内のTODOコメント参照）
-  - [ ] DB側RPC（security definer関数）で権限チェック・重複防止（ダブルブッキング）を再実装したうえで、index.htmlのscriptタグを`js/store.js`→`js/config.js`+`js/store-supabase.js`（+supabase-jsのCDN）に差し替え、動作確認する
-- 状態：**骨格（雛形）まで完了。実接続・DB側RPC実装・切替は人間ゲート**
+- 必要な作業：
+  - [x] RPC・不足カラムのSQLを用意：`supabase/schema_v2_rpc.sql`（2026-07-06完了。招待コード・確定後キャンセル・通知既読カーソル・adminsテーブル・RLSポリシー・全状態遷移のsecurity definer RPC＝権限チェック／ダブルブッキング防止／AuditLog記録をDB層で強制。実行者は auth.uid() から導出＝なりすまし不能）
+  - [x] `js/store-supabase.js` を本実装に更新（store.jsと同一シグネチャでRPC呼び出し・読み取りヘルパ付き）
+  - [ ] ⏸人間待ち：Supabaseプロジェクトを作成し、接続情報（URL・anon key）を用意→`js/config.example.js`を`js/config.js`にコピーして記入
+  - [ ] ⏸人間待ち：SQL Editorで `schema.sql` → `schema_v2_rpc.sql` の順に実行、Auth（Email）を有効化、adminsテーブルに運営ユーザーを登録（schema_v2_rpc.sql末尾の手順）
+  - [ ] index.htmlのscriptタグを差し替え（store.js → supabase-js CDN + config.js + store-supabase.js）て動作確認。ビュー層の一覧取得（DB.postings直参照）のfetch化はこの時に実施
+- 状態：**DB側の設計・SQL・アダプタまで完了（2026-07-06）。残り＝アカウント作成とSQL適用（約15分）＋切替動作確認**
 
 ### 2. 医師側・病院側のUXに問題がないこと
 
