@@ -41,3 +41,14 @@
 - 2026-07-05 利用規約・プライバシーポリシーのドラフト：docs/terms_draft.mdを新設。事業スキームの前提（募集情報等提供事業への該当整理、あっせん非該当の設計意図、特定募集情報等提供事業者の届出要否は要確認）を明記したうえで、利用規約（本サービスの内容・実在確認・禁止事項・ダブルブッキング防止・キャンセル時の扱い＝ペナルティを科さない設計・免責事項）とプライバシーポリシー（取得情報・利用目的・第三者提供＝承認後の連絡先相互開示・書類の取扱い・削除）のたたき台を作成。冒頭と末尾に「弁護士確認前の公開禁止」「未確定・要確認事項一覧」を明記し、⏸人間待ち（弁護士確認）であることを明示。コードの変更はなし（ドキュメントのみ）のためnode --check／node --testへの影響なし（既存17件は引き続き全通過を確認）
 - 2026-07-05 Supabaseアダプタ骨格：js/store-supabase.jsを新設し、store.jsと同じ関数名（auth.signup/login/logout/me、api.registerDoctor/registerHospital/joinHospitalByInviteCode/regenerateInviteCode/publishPosting/apply/approve/decline/withdraw/cancelAssignment/complete/selfReportBooking/sendMessage/verifyDoctor/verifyHospital/verifyCredential/markNotificationsRead）をsupabase-jsのcreateClient・auth・rpc呼び出しの雛形として実装（状態遷移はDB側security definer RPC経由とし、重複防止・権限チェックをDB層でも再実装する前提のTODOコメントを付記。招待コード・通知既読カーソル・確定後キャンセルはsupabase/schema.sqlに未定義のため対応RPC/テーブル追加が必要な旨を明記）。js/config.example.js（SUPABASE_URL/ANON_KEYの雛形）を新設し、.gitignoreにjs/config.jsを追加（実接続情報はコミットしない）。index.htmlはjs/store.jsのままで本ファイルは未読み込み＝現行アプリの動作に影響なし。実際の切替（config.js作成・RPC実装・schema適用・script差し替え）は人間ゲート。node --check js/*.js全通過、既存node --test 17件も全通過（store.js無変更）
 - 2026-07-06 Supabase本番準備（C）: supabase/schema_v2_rpc.sqlを新設（不足カラム=招待コード/キャンセル/通知カーソル/admins、RLSポリシー、全状態遷移のsecurity definer RPC。権限チェック・ダブルブッキング防止・AuditLogをDB層で強制、実行者はauth.uid()から導出しなりすまし不能、pg_advisory_xact_lockで同時応募レースも防止）。js/store-supabase.jsを雛形→本実装に更新（同一シグネチャ・rpc()ラッパ・読み取りヘルパ）。RELEASE_CHECKLIST項目1を更新。node --check/node --test 17件全通過（store.js無変更）
+
+## タスクキュー v2（2026-07-06 追加・上から順に）
+※ルールは冒頭と同じ（1回1〜2個・devブランチのみ・mainへのpush禁止・②データ構造凍結・Legal by Design厳守）
+
+- [ ] **読み取りアクセスの一元化(1/2)**：app.jsがDB.postings/DB.hospitalsを直接参照している箇所を洗い出し、store.jsに読み取り関数（listOpenPostings()/getPosting(id)/getHospital(id)）を追加して医師側ビュー（地図・日付・詳細）だけ置き換える。挙動は完全に同一であること（見た目・件数が変わったら失敗）。完了条件：node --test全通過＋Playwrightで医師フロー（ログイン→地図→詳細→手上げ）が従来通り動く
+- [ ] **読み取りアクセスの一元化(2/2)**：同様に病院側ビュー（カレンダー・応募者・確定）と運営ビューを置き換える。完了条件は同上（病院フロー・運営フローで確認）。※この2タスクはSupabase切替時にfetch関数へ差し替えるための下準備
+- [ ] **E2Eスモークテスト**：tests/e2e/smoke.spec.mjs を新設し、Playwright（既にUX点検で使用実績あり）で3フローを自動化：①医師=ログイン→地図→詳細→手上げ→マイページに反映 ②病院=ログイン→応募確認→承認→カレンダーが🟢 ③運営=ログイン→AuditLog表示。完了条件：実行方法をREADMEに追記し、3本とも安定して通る
+- [ ] **運用マニュアル**：docs/OPS_MANUAL.md を新設。運営（ゼロベース）の日次/週次手順書：医師の実在確認のやり方（厚労省 医師等資格確認検索の手順・判断基準・記録の残し方）、病院の実在確認（医療情報ネット・代表電話）、AuditLogの見方、問い合わせ対応の定型文。※「運営がやらないこと（推薦・引き合わせ・チャット参加）」の禁止リストを冒頭に明記
+- [ ] **パイロット招待キット**：docs/PILOT_GUIDE.md を新設。①医師向け1枚（登録→地図→手上げの3ステップ・スクショ想定位置をプレースホルダで）②病院向け1枚（登録→実在確認→募集3分→承認）③よくある質問10個（雇用は病院と直接・紹介手数料なし・キャンセルの扱い・交通費）。文体は既存UIと同じ「です/ます・専門用語回避」
+- [ ] **アクセシビリティ自己点検**：キーボード操作（Tab順・Enterで送信）、コントラスト（薄いグレー文字）、ボタンのaria-label、モーダルのフォーカストラップを点検し、小規模修正はその場で・大規模はdocs/UX_CHECKLIST.mdに追記。完了条件：点検結果の記録＋node --test全通過
+- [ ] **デモデータの分離**：seedDB()のデモ募集・デモ医師を DEMO_MODE フラグ（config優先・既定true）で制御できるようにし、本番切替時にデモデータ無しで起動できる下準備をする。既定の動作（デモあり）は変えない。完了条件：フラグをfalseにすると空の状態で起動し、trueで従来通り
