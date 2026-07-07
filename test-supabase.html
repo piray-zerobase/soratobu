@@ -51,6 +51,14 @@
   <button onclick="t_read()">hospitals / postings を読む</button>
 </div>
 
+<div class="box">
+  <h2 style="margin-top:0;">⑥ 医籍チェックの確認（セキュリティテスト）</h2>
+  <p class="note">(a)は<b>未登録の別アカウント</b>でログインしてから実行（例 test-doctor2@example.com を新規登録→ログイン）。<br>
+  (b)は「⚠️ 運営権限が必要です」と<b>拒否されるのが正解</b>（医師が自分を承認する抜け道が無いことの証明）。</p>
+  <button onclick="t_badlicense()">(a) 不正な医籍番号（12a）で登録を試す → 拒否が正解</button>
+  <button class="orange" onclick="t_selfverify()">(b) 自分で自分を承認してみる → 拒否が正解</button>
+</div>
+
 <h2>ログ</h2>
 <div id="log">ここに結果が表示されます。①から順にどうぞ。</div>
 
@@ -106,6 +114,30 @@ async function t_read(){
     const p = await fetchOpenPostings();
     log(`✅ hospitals: ${ (h.data||[]).length }件 ／ open postings: ${ (p.data||[]).length }件`, "ok");
     log(`   ※RLS越しなので「自分に見えてよいもの」だけが返ります`, "");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_badlicense(){
+  try{
+    const r = await api.registerDoctor(null, {
+      name:"形式テスト 花子", licenseNo:"12a", hokeniNo:"",
+      specialties:["内科"], capabilities:["当直"], homeBase:"ITM",
+    });
+    if(r.err){
+      if(r.err.includes("登録されています"))
+        return log("⚠️ このアカウントは登録済みです。(a)は未登録の別アカウント（test-doctor2@等）でログインしてから実行してください", "ng");
+      return log(`✅ 形式チェック作動！ 不正な医籍番号はDB側で拒否されました → 「${r.err}」`, "ok");
+    }
+    log("❌ 問題：不正な番号なのに登録できてしまいました（要修正）", "ng");
+  }catch(e){ log("❌ "+e.message, "ng"); }
+}
+async function t_selfverify(){
+  try{
+    const prof = await sbClient.rpc("get_my_profile");
+    const myId = prof.data && prof.data.refId;
+    if(!myId) return log("⚠️ 先に④で医師登録してから実行してください", "ng");
+    const r = await sbClient.rpc("verify_doctor", { p_doctor_id: myId, p_approve: true });
+    if(r.error) return log(`✅ 権限の壁が作動！ 医師は自分を承認できません → 「${r.error.message}」`, "ok");
+    log("❌ 問題：医師なのに承認できてしまいました（要修正）", "ng");
   }catch(e){ log("❌ "+e.message, "ng"); }
 }
 </script>
