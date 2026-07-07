@@ -55,3 +55,15 @@
 - [ ] **デモデータの分離**：seedDB()のデモ募集・デモ医師を DEMO_MODE フラグ（config優先・既定true）で制御できるようにし、本番切替時にデモデータ無しで起動できる下準備をする。既定の動作（デモあり）は変えない。完了条件：フラグをfalseにすると空の状態で起動し、trueで従来通り
 - 2026-07-06 Supabase実接続（人間ゲート消化）: プロジェクト作成（東京リージョン・Free）→schema.sql+schema_v2_rpc.sql適用済み→REST疎通確認OK（RLS稼働・[]応答）。js/config.js作成（gitignore済）。test-supabase.htmlを新設（接続/新規登録/ログイン/get_my_profile/医師登録RPC/RLS読み取りの動作確認ページ）
 - 2026-07-07 RLS無限再帰バグ修正: postings⇄applications等のポリシー相互参照が原因（infinite recursion）。横断判定をsecurity definer関数（my_application_posting_ids等5つ）に置換。schema_v2_1_fix_rls.sql（適用用）＋schema_v2_rpc.sql（本家）を修正
+
+## タスクキュー v3（2026-07-07 追加）：本体アプリのクラウド切替
+※方針＝**キャッシュ＋リフレッシュ方式**：ビュー層は今の同期的な書き方をほぼ保ち、クラウドから取得したデータを「DBと同じ形のキャッシュ」に入れてから描画する。
+※重要制約＝**エージェントは接続鍵(js/config.js)を持たない・実DBに接続しない・鍵をリポジトリに追加しない**。検証はすべてモック（偽のsupabaseクライアント）で行う。実DBでの最終検証は人間ゲート。
+
+- [ ] **クラウド切替(1/6) マッピング層**：js/cloud-map.js を新設。DBの行（snake_case：hospital_id/time_start/required_credentials…）⇄ ビューが使う形（camelCase：hospitalId/timeStart/requiredCredentials…）の変換関数を posting/hospital/doctor/application/assignment/message の6種類ぶん実装。完了条件：tests/cloudMap.test.mjs で各変換の往復テスト＋node --test全通過
+- [ ] **クラウド切替(2/6) 読み取りフェッチの拡充**：js/store-supabase.js に読み取り関数を追加：fetchMyDoctor()/fetchMyHospital()/fetchApplicationsForMyPostings()/fetchMyAssignments()/fetchMessages(applicationId)/fetchAdminQueues()（審査中の医師・病院、確認中credentials、audit_log最新50件）。RLSで見える範囲しか返らない前提で書く。完了条件：tests/helpers/mockSupabase.mjs（from/select/eq/order/rpcを模倣する偽クライアント）を新設しユニットテストで検証
+- [ ] **クラウド切替(3/6) キャッシュ層**：js/store-cloud.js を新設。DBと同じ形（postings/hospitals/doctors/applications/assignments/messages/audit配列を持つオブジェクト）のキャッシュを保持し、refreshAll(role)が(2)のfetch群＋(1)の変換で埋める。auth/apiはstore-supabase.jsへ委譲し、**書き込み成功後は必ずrefreshAll→render**。完了条件：モッククライアントで「refreshAll→キャッシュの形がstore.jsのDBと同じキー構成」をテスト
+- [ ] **クラウド切替(4/6) ハンドラのasync化**：js/app.js の書き込み系ハンドラ（doApply/doApprove/doDecline/doWithdraw/doCancelAssignment/doComplete/doBook/sendChat/wizPublish/doRegisterDoctor/doRegisterHospital/doJoinInvite系/doVerify系/openChat）を async/await 対応にする。同期のstore.js（デモモード）でも壊れないよう `const r = await Promise.resolve(api.xxx(...))` の形に統一。完了条件：デモモードの挙動が完全に不変（node --test＋Playwrightで医師・病院フロー確認）
+- [ ] **クラウド切替(5/6) cloud.html**：index.html のコピーとして cloud.html を新設し、script構成を supabase-js CDN → js/config.js → js/store-supabase.js → js/cloud-map.js → js/store-cloud.js → js/master.js → js/app.js に（js/store.jsは読み込まない）。config.js が無い環境では「⏸未接続：接続設定が必要です」画面を出して落ちないこと。ログイン後とリロード時はsupabaseの保存セッション＋get_my_profile()からauth.session（role/refId）を復元。完了条件：モックでの起動テスト＋デモ版index.htmlに一切影響しないこと
+- [ ] **クラウド切替(6/6) パイロット用シード**：supabase/seed_pilot.sql を新設。島の実在病院3院（徳之島徳洲会病院・屋久島徳洲会病院・種子島医療センター：master.jsの座標・空港コードを転記）を status='承認'・invite_code付きで直接insert＋サンプル募集2件（noteに「動作確認用サンプル」と明記）。完了条件：SQLとして構文が正しいこと（コメントで適用手順を記載。実行そのものは人間ゲート）
+- [ ] ⏸人間待ち **実DB検証と公開切替**：config.jsを持つ人間が cloud.html を実DBで検証（登録→承認→募集→手上げ→承認→チャット→完了の全ループを2アカウントで）→ 問題なければ index.html を cloud構成に差し替えて main へマージ（＝公開。人間のみが実行）。検証チェックリストは docs/RELEASE_CHECKLIST.md に追記すること
