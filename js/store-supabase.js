@@ -50,7 +50,11 @@ const auth = {
   async login(email, pass){
     assertClient();
     const { data, error } = await sbClient.auth.signInWithPassword({ email, password: pass });
-    if(error) return {err:"メールアドレスまたはパスワードが違います"};
+    if(error){
+      if(/confirm/i.test(error.message))
+        return {err:"メールアドレスの確認が済んでいません（運営側の設定でConfirm emailをOFFにするか、確認メールのリンクを開いてください）"};
+      return {err:"メールアドレスまたはパスワードが違います"};
+    }
     const prof = await rpc("get_my_profile");
     if(prof.err) return prof;
     const p = prof.data || {};
