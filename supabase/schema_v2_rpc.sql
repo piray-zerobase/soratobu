@@ -483,12 +483,38 @@ alter table messages       enable row level security;
 alter table audit_log      enable row level security;
 alter table notif_cursor   enable row level security;
 
+-- ★ポリシー内のテーブル横断参照は必ず security definer 関数経由にする
+--   （postings⇄applicationsのような相互参照は infinite recursion になる。2026-07-07修正）
+create or replace function my_application_posting_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select posting_id from applications where doctor_id = current_doctor_id()
+$$;
+create or replace function my_assignment_posting_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select posting_id from assignments where doctor_id = current_doctor_id()
+$$;
+create or replace function my_application_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select id from applications where doctor_id = current_doctor_id()
+$$;
+create or replace function my_hospital_application_ids() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select a.id from applications a join postings p on p.id = a.posting_id
+  where p.hospital_id = current_hospital_id()
+$$;
+create or replace function doctors_engaged_with_my_hospital() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select a.doctor_id from applications a join postings p on p.id = a.posting_id
+  where p.hospital_id = current_hospital_id()
+  union
+  select s.doctor_id from assignments s where s.hospital_id = current_hospital_id()
+$$;
+
 -- 医師：自分の行／運営：全件／病院：自院の募集に応募・確定した医師のみ
 create policy doctors_select on doctors for select using (
   user_id = auth.uid()
   or is_admin()
-  or exists (select 1 from applications a join postings p on p.id = a.posting_id
-             where a.doctor_id = doctors.id and p.hospital_id = current_hospital_id())
+  or id in (select doctors_engaged_with_my_hospital())
 );
 
 -- 書類：本人と運営のみ
@@ -507,19 +533,19 @@ create policy hospital_users_select on hospital_users for select using (
   user_id = auth.uid() or hospital_id = current_hospital_id()
 );
 
--- 募集：open（承認済み病院のもの）は全医師に公開／自院分／運営
+-- 募集：open（承認済み病院のもの）は全医師に公開／自院分／自分が応募・確定した分／運営
 create policy postings_select on postings for select using (
   (status = 'open' and exists (select 1 from hospitals h where h.id = postings.hospital_id and h.status = '承認'))
   or hospital_id = current_hospital_id()
-  or exists (select 1 from applications a where a.posting_id = postings.id and a.doctor_id = current_doctor_id())
-  or exists (select 1 from assignments s where s.posting_id = postings.id and s.doctor_id = current_doctor_id())
+  or id in (select my_application_posting_ids())
+  or id in (select my_assignment_posting_ids())
   or is_admin()
 );
 
 -- 応募：本人／募集元の病院／運営（監査のための読み取りのみ）
 create policy applications_select on applications for select using (
   doctor_id = current_doctor_id()
-  or exists (select 1 from postings p where p.id = applications.posting_id and p.hospital_id = current_hospital_id())
+  or id in (select my_hospital_application_ids())
   or is_admin()
 );
 
@@ -530,10 +556,8 @@ create policy assignments_select on assignments for select using (
 
 -- メッセージ：当事者のみ（★運営は読めない＝やりとりに一切介在しない）
 create policy messages_select on messages for select using (
-  exists (select 1 from applications a where a.id = messages.application_id
-          and a.doctor_id = current_doctor_id())
-  or exists (select 1 from applications a join postings p on p.id = a.posting_id
-             where a.id = messages.application_id and p.hospital_id = current_hospital_id())
+  application_id in (select my_application_ids())
+  or application_id in (select my_hospital_application_ids())
 );
 
 -- 監査ログ：運営のみ読める（書き込みはlog_audit経由のみ）

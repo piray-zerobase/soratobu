@@ -54,3 +54,4 @@
 - [ ] **アクセシビリティ自己点検**：キーボード操作（Tab順・Enterで送信）、コントラスト（薄いグレー文字）、ボタンのaria-label、モーダルのフォーカストラップを点検し、小規模修正はその場で・大規模はdocs/UX_CHECKLIST.mdに追記。完了条件：点検結果の記録＋node --test全通過
 - [ ] **デモデータの分離**：seedDB()のデモ募集・デモ医師を DEMO_MODE フラグ（config優先・既定true）で制御できるようにし、本番切替時にデモデータ無しで起動できる下準備をする。既定の動作（デモあり）は変えない。完了条件：フラグをfalseにすると空の状態で起動し、trueで従来通り
 - 2026-07-06 Supabase実接続（人間ゲート消化）: プロジェクト作成（東京リージョン・Free）→schema.sql+schema_v2_rpc.sql適用済み→REST疎通確認OK（RLS稼働・[]応答）。js/config.js作成（gitignore済）。test-supabase.htmlを新設（接続/新規登録/ログイン/get_my_profile/医師登録RPC/RLS読み取りの動作確認ページ）
+- 2026-07-07 RLS無限再帰バグ修正: postings⇄applications等のポリシー相互参照が原因（infinite recursion）。横断判定をsecurity definer関数（my_application_posting_ids等5つ）に置換。schema_v2_1_fix_rls.sql（適用用）＋schema_v2_rpc.sql（本家）を修正
