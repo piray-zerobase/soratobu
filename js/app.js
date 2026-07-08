@@ -580,8 +580,8 @@ const W_TYPES=[["当直","b-touku"],["外来応援","b-gairai"],["健診応援",
 const W_TIMES=[["18:00","09:00",true],["17:00","09:00",true],["09:00","17:00",false],["09:00","15:00",false],["09:00","12:00",false]];
 function renderHospital(root){
   const h=hp();
-  const pos=DB.postings.filter(p=>p.hospitalId===h.id);
-  const inbox=DB.applications.filter(a=>a.status==="applied"&&pos.some(p=>p.id===a.postingId)).length;
+  const pos=listPostingsForHospital(h.id);
+  const inbox=pos.reduce((n,p)=>n+listApplicationsForPosting(p.id).filter(a=>a.status==="applied").length,0);
   root.innerHTML=`
   <div class="paneltitle">🏥 <b>${esc(h.name)}</b>（✓ ${esc(h.verifiedNote)}）
     <button class="btn sm teal" style="margin-left:10px;" onclick="openWizard()">＋ 新規募集（3分）</button>
@@ -602,8 +602,8 @@ function renderHospital(root){
     const cell=document.createElement("div");cell.className="cell";
     cell.innerHTML=`<div class="num">${dd}</div>`;
     pos.filter(p=>+p.date.split("-")[2]===dd).forEach(p=>{
-      const n=DB.applications.filter(a=>a.postingId===p.id&&a.status==="applied").length;
-      const asg=DB.assignments.filter(a=>a.postingId===p.id).slice(-1)[0];
+      const n=listApplicationsForPosting(p.id).filter(a=>a.status==="applied").length;
+      const asg=getAssignmentForPosting(p.id);
       const el=document.createElement("div");
       if(p.status==="open"){el.className="slot s-open"+(p.urgent?" blink2":"");el.textContent=`🟡 ${p.type} 応募${n}`;}
       else if(p.status==="confirmed"){el.className="slot s-conf";el.textContent=`🟢 ${p.type} ${dname(asg.doctorId).split(" ")[0]}`;}
@@ -615,12 +615,12 @@ function renderHospital(root){
   }
 }
 function hospSlot(poId){
-  const p=DB.postings.find(x=>x.id===poId);
+  const p=getPosting(poId);
   if(p.status==="open"){
-    const apps=DB.applications.filter(a=>a.postingId===poId&&a.status==="applied");
+    const apps=listApplicationsForPosting(poId).filter(a=>a.status==="applied");
     openModal(`<h3>手上げの確認（${dstr(p.date)} ${p.type}）</h3>
       <div class="sub">${esc(p.department)}・${p.timeStart}〜${p.overnight?"翌":""}${p.timeEnd}・${yen(p.pay)}／交通費 ${esc(p.transport)}</div>
-      ${apps.length?apps.map(a=>{const d=DB.doctors.find(x=>x.id===a.doctorId);return `
+      ${apps.length?apps.map(a=>{const d=getDoctor(a.doctorId);return `
         <div class="appcard"><span class="nm">${esc(d.name)}</span><span class="verified">✓ 実在確認済</span>
           <div class="meta">${d.specialties.join("・")}／スポット実績 ${d.completedCount}回</div>
           <div class="meta">✈ ${esc(a.itinerary.summary)}</div>
@@ -631,8 +631,8 @@ function hospSlot(poId){
       :'<div class="paneltitle" style="text-align:center;padding:14px;">まだ手上げがありません。登録医師に公開中です。</div>'}
       <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
   } else {
-    const asg=DB.assignments.filter(a=>a.postingId===poId).slice(-1)[0];
-    const ap=DB.applications.find(a=>a.postingId===poId&&a.status==="approved");
+    const asg=getAssignmentForPosting(poId);
+    const ap=listApplicationsForPosting(poId).find(a=>a.status==="approved");
     openModal(`<h3>${p.status==="completed"?"完了":"確保済み"}（${dstr(p.date)} ${p.type}）</h3>
       <div class="summ">
         <div class="l"><span>担当医</span><b style="color:var(--ok)">${esc(dname(asg.doctorId))}</b></div>
@@ -673,7 +673,7 @@ function doComplete(asgId){
   const r=api.complete(hp().id,asgId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました");
 }
 function openWizard(fromId){
-  const src = fromId ? DB.postings.find(p=>p.id===fromId) : null;
+  const src = fromId ? getPosting(fromId) : null;
   if(src){
     const tyIdx = W_TYPES.findIndex(t=>t[0]===src.type);
     const tiIdx = W_TIMES.findIndex(t=>t[0]===src.timeStart && t[1]===src.timeEnd && t[2]===!!src.overnight);
@@ -686,7 +686,7 @@ function openWizard(fromId){
 }
 function openTemplatePicker(){
   const h=hp();
-  const list=DB.postings.filter(p=>p.hospitalId===h.id).sort((a,b)=>seqOf(b.id)-seqOf(a.id)).slice(0,10);
+  const list=listPostingsForHospital(h.id).sort((a,b)=>seqOf(b.id)-seqOf(a.id)).slice(0,10);
   openModal(`<h3>📋 前回の募集をコピー</h3>
     <div class="sub">選んだ内容を元に、日にちだけ変えて公開できます</div>
     ${list.map(p=>`<div class="appcard" style="cursor:pointer;" onclick="useTemplate('${p.id}')">
@@ -745,10 +745,9 @@ function wizPublish(){
 
 /* ---------- 運営 ---------- */
 function renderAdmin(root){
-  const drQ=DB.doctors.filter(d=>d.status==="審査中");
-  const hpQ=DB.hospitals.filter(h=>h.status==="審査中");
-  const credQ=[];
-  DB.doctors.filter(d=>d.status==="承認").forEach(d=>d.credentials.filter(c=>c.status==="確認中").forEach(c=>credQ.push({d,c})));
+  const drQ=listDoctorsByStatus("審査中");
+  const hpQ=listHospitalsByStatus("審査中");
+  const credQ=listCredentialQueue();
   root.innerHTML=`
   <div class="paneltitle">⚙️ 運営コンソール（ゼロベース）</div>
   <div class="notice">⚖️ <b>Legal by Design</b>：運営には「医師を病院に割り当てる」「やりとりに参加する」機能が<b>存在しません</b>。
@@ -778,7 +777,7 @@ function renderAdmin(root){
   ||'<div class="paneltitle">確認待ちはありません</div>'}
   <div class="section-h">🧾 AuditLog（追記専用・新しい順）</div>
   <div style="margin-bottom:8px;"><button class="btn sm ghost" onclick="if(confirm('デモデータを初期化しますか？')){resetDB();location.reload();}">デモデータ初期化</button></div>
-  ${DB.audit.slice(0,40).map(a=>`<div class="audit">[${a.ts}] <b>${esc(a.actor)}</b> ${esc(a.action)}<br>${esc(a.detail||"")}</div>`).join("")}`;
+  ${listAuditLog(40).map(a=>`<div class="audit">[${a.ts}] <b>${esc(a.actor)}</b> ${esc(a.action)}<br>${esc(a.detail||"")}</div>`).join("")}`;
 }
 function doVerifyDr(id,ok){ const r=api.verifyDoctor(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
 function doVerifyHp(id,ok){ const r=api.verifyHospital(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }

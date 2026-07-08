@@ -185,6 +185,18 @@ function findScheduleConflict(doctorId, targetPo, excludeApplicationId){
 function listOpenPostings(){ return DB.postings.filter(p=>p.status==="open"); }
 function getPosting(id){ return DB.postings.find(p=>p.id===id); }
 function getHospital(id){ return DB.hospitals.find(h=>h.id===id); }
+function getDoctor(id){ return DB.doctors.find(d=>d.id===id); }
+function listPostingsForHospital(hospitalId){ return DB.postings.filter(p=>p.hospitalId===hospitalId); }
+function listApplicationsForPosting(postingId){ return DB.applications.filter(a=>a.postingId===postingId); }
+function getAssignmentForPosting(postingId){ return DB.assignments.filter(a=>a.postingId===postingId).slice(-1)[0]; }
+function listDoctorsByStatus(status){ return DB.doctors.filter(d=>d.status===status); }
+function listHospitalsByStatus(status){ return DB.hospitals.filter(h=>h.status===status); }
+function listCredentialQueue(){
+  const out=[];
+  DB.doctors.filter(d=>d.status==="承認").forEach(d=>d.credentials.filter(c=>c.status==="確認中").forEach(c=>out.push({d,c})));
+  return out;
+}
+function listAuditLog(limit){ return DB.audit.slice(0, limit); }
 
 /* ---------- 業務API（状態遷移＋Audit一元化） ---------- */
 const api = {
