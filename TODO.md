@@ -48,7 +48,7 @@
 
 - [x] **読み取りアクセスの一元化(1/2)**：app.jsがDB.postings/DB.hospitalsを直接参照している箇所を洗い出し、store.jsに読み取り関数（listOpenPostings()/getPosting(id)/getHospital(id)）を追加して医師側ビュー（地図・日付・詳細）だけ置き換える。挙動は完全に同一であること（見た目・件数が変わったら失敗）。完了条件：node --test全通過＋Playwrightで医師フロー（ログイン→地図→詳細→手上げ）が従来通り動く
 - [x] **読み取りアクセスの一元化(2/2)**：同様に病院側ビュー（カレンダー・応募者・確定）と運営ビューを置き換える。完了条件は同上（病院フロー・運営フローで確認）。※この2タスクはSupabase切替時にfetch関数へ差し替えるための下準備
-- [ ] **E2Eスモークテスト**：tests/e2e/smoke.spec.mjs を新設し、Playwright（既にUX点検で使用実績あり）で3フローを自動化：①医師=ログイン→地図→詳細→手上げ→マイページに反映 ②病院=ログイン→応募確認→承認→カレンダーが🟢 ③運営=ログイン→AuditLog表示。完了条件：実行方法をREADMEに追記し、3本とも安定して通る
+- [x] **E2Eスモークテスト**：tests/e2e/smoke.spec.mjs を新設し、Playwright（既にUX点検で使用実績あり）で3フローを自動化：①医師=ログイン→地図→詳細→手上げ→マイページに反映 ②病院=ログイン→応募確認→承認→カレンダーが🟢 ③運営=ログイン→AuditLog表示。完了条件：実行方法をREADMEに追記し、3本とも安定して通る
 - [ ] **運用マニュアル**：docs/OPS_MANUAL.md を新設。運営（ゼロベース）の日次/週次手順書：医師の実在確認のやり方（厚労省 医師等資格確認検索の手順・判断基準・記録の残し方）、病院の実在確認（医療情報ネット・代表電話）、AuditLogの見方、問い合わせ対応の定型文。※「運営がやらないこと（推薦・引き合わせ・チャット参加）」の禁止リストを冒頭に明記
 - [ ] **パイロット招待キット**：docs/PILOT_GUIDE.md を新設。①医師向け1枚（登録→地図→手上げの3ステップ・スクショ想定位置をプレースホルダで）②病院向け1枚（登録→実在確認→募集3分→承認）③よくある質問10個（雇用は病院と直接・紹介手数料なし・キャンセルの扱い・交通費）。文体は既存UIと同じ「です/ます・専門用語回避」
 - [ ] **アクセシビリティ自己点検**：キーボード操作（Tab順・Enterで送信）、コントラスト（薄いグレー文字）、ボタンのaria-label、モーダルのフォーカストラップを点検し、小規模修正はその場で・大規模はdocs/UX_CHECKLIST.mdに追記。完了条件：点検結果の記録＋node --test全通過
@@ -56,6 +56,7 @@
 - 2026-07-06 Supabase実接続（人間ゲート消化）: プロジェクト作成（東京リージョン・Free）→schema.sql+schema_v2_rpc.sql適用済み→REST疎通確認OK（RLS稼働・[]応答）。js/config.js作成（gitignore済）。test-supabase.htmlを新設（接続/新規登録/ログイン/get_my_profile/医師登録RPC/RLS読み取りの動作確認ページ）
 - 2026-07-07 RLS無限再帰バグ修正: postings⇄applications等のポリシー相互参照が原因（infinite recursion）。横断判定をsecurity definer関数（my_application_posting_ids等5つ）に置換。schema_v2_1_fix_rls.sql（適用用）＋schema_v2_rpc.sql（本家）を修正
 - 2026-07-08 読み取りアクセスの一元化(2/2)：js/store.jsに読み取り関数を追加（getDoctor/listPostingsForHospital/listApplicationsForPosting/getAssignmentForPosting/listDoctorsByStatus/listHospitalsByStatus/listCredentialQueue/listAuditLog）。app.jsの病院側ビュー（renderHospital のカレンダー・inbox集計、hospSlot の応募者一覧・確定モーダル、openWizard/openTemplatePicker のテンプレ複製）と運営ビュー（renderAdmin の実在確認待ちキュー・追加書類確認待ち・AuditLog表示）のDB直参照をすべて置き換え。挙動は完全に同一（DBラップのみ、ロジック無変更）。node --check全通過、既存node --test 17件全通過。Playwright（Chromiumヘッドレス）で①病院ログイン→カレンダー→応募者確認モーダル→テンプレ複製モーダル、②運営ログイン→実在確認待ち・追加書類確認待ち・AuditLog表示、③医師の実応募→病院の承認（UI経由）→カレンダーが🟢化→確定モーダル表示、の3シナリオを確認しコンソールエラー無しを確認
+- 2026-07-09 E2Eスモークテスト：tests/e2e/smoke.spec.mjs を新設。Node組み込みのhttpモジュールでリポジトリを配信する使い捨てサーバーを起動し、実行環境にグローバル導入済みのPlaywright（新規依存追加なし。require.resolveでグローバルnode_modulesから解決し、無い環境ではテストを自動skip）でChromiumを操作。デモシード固定値（po_1＝hp_1 徳之島徳洲会病院／2026-07-12／ワクチン）に基づき、①医師=ログイン→日付タブ→詳細→手を挙げる→マイページで「承認待ち」表示 ②病院=同フロー後ログイン→応募確認→承認→カレンダーが🟢化 ③運営=ログイン→AuditLog表示（1件以上）、の3本を実装。各テストはブラウザを毎回新規contextで起動する（localStorage初期化）ためseedDBからやり直され、3回連続実行して安定して全通過することを確認。README.mdに実行方法（`node --test tests/e2e/smoke.spec.mjs`。デフォルトの`node --test`の対象パターンには含まれないため別コマンドと明記）を追記。node --check js/*.js全通過、既存node --test 17件（store 13 + seatAvailability 4）も無変更で全通過
 
 ## タスクキュー v3（2026-07-07 追加）：本体アプリのクラウド切替
 ※方針＝**キャッシュ＋リフレッシュ方式**：ビュー層は今の同期的な書き方をほぼ保ち、クラウドから取得したデータを「DBと同じ形のキャッシュ」に入れてから描画する。

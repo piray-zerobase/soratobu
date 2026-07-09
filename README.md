@@ -62,6 +62,17 @@ gh api repos/{owner}/soratobu/pages -X POST -f 'source[branch]=main' -f 'source[
 node --test
 ```
 
+### E2Eスモークテスト（実ブラウザでの動作確認）
+
+`tests/e2e/smoke.spec.mjs` は Playwright（Chromium）でアプリを実際に操作し、医師・病院・運営の3フローが通しで動くことを確認します。単体テストとは別コマンドで実行します（デフォルトの `node --test` の対象パターンには含まれません）。
+
+```bash
+node --test tests/e2e/smoke.spec.mjs
+```
+
+- Playwrightが導入されていない環境では自動的にスキップされます（テスト失敗にはなりません）
+- 対象データはデモモードの初期シード（`js/store.js` seedDB）の固定値に依存します。ブラウザは毎回まっさらな状態（localStorage無し）で起動するため、繰り返し実行しても結果は安定します
+
 ## 運用ルール（制度として）
 
 - 運営（ゼロベース）がやること：実在確認（病院・医師・書類）、AuditLog監査、便マスタ更新
