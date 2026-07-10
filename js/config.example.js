@@ -9,4 +9,9 @@
 const SORATOBU_CONFIG = {
   SUPABASE_URL: "https://YOUR-PROJECT-REF.supabase.co",
   SUPABASE_ANON_KEY: "YOUR-ANON-KEY",
+  // false にするとjs/store.jsのデモ医師(dr_1)・デモ募集(po_1〜5)・
+  // デモ医師ログイン(yamada@example.com)を投入しない（本番切替の下準備）。
+  // 未指定（既定）は true 扱いで従来通りデモデータあり。
+  // シード病院3院（病院マスタ）と病院/admin運営アカウントはこのフラグの対象外（常に投入）。
+  DEMO_MODE: true,
 };

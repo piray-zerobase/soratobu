@@ -21,11 +21,12 @@ function makeStorage(){
   };
 }
 
-export function loadStore(){
+export function loadStore(opts){
+  const config = opts && opts.config;
   const masterSrc = fs.readFileSync(path.join(ROOT, "js", "master.js"), "utf8");
   const storeSrc = fs.readFileSync(path.join(ROOT, "js", "store.js"), "utf8");
   const footer = `
-    globalThis.__store = { api, auth, resetDB, saveDB, getDB: () => DB };
+    globalThis.__store = { api, auth, resetDB, saveDB, getDB: () => DB, ensureSeedUsers };
   `;
 
   const sandbox = {
@@ -35,6 +36,7 @@ export function loadStore(){
     localStorage: makeStorage(),
     sessionStorage: makeStorage(),
   };
+  if(config) sandbox.SORATOBU_CONFIG = config;
   vm.createContext(sandbox);
   vm.runInContext(masterSrc + "\n" + storeSrc + "\n" + footer, sandbox, { filename: "store-bundle.js" });
 

@@ -8,6 +8,13 @@
 
 const LSKEY = "soratobu_v02";
 
+/* ---------- デモデータ制御（config優先・既定true＝従来通りデモあり） ----------
+   本番切替の下準備：js/config.js（SORATOBU_CONFIG）でDEMO_MODE:falseを指定すると
+   デモ医師(dr_1)・デモ募集(po_1〜5)・デモ医師ログイン(yamada)を投入しない。
+   シード病院3院（hp_1/2/3＝実在の離島病院マスタと一致）と病院/admin
+   ログインアカウントは「病院マスタ」「運営アカウント」であり本タスクの対象外のため残す。 */
+const DEMO_MODE = (typeof SORATOBU_CONFIG !== "undefined" && SORATOBU_CONFIG.DEMO_MODE === false) ? false : true;
+
 /* ---------- パスワードハッシュ（デモ用：SHA-256+salt） ----------
    注意：クライアント内デモの簡易実装。本番はSupabase Authを使う。 */
 async function hashPass(pass, salt){
@@ -49,38 +56,40 @@ function seedDB(){
       facilities:"送迎あり・宿は病院手配", inviteCode:genInviteCode(),
     });
   });
-  // デモ医師（承認済み）
-  db.doctors.push({
-    id:"dr_1", name:"山田 太郎", email:"yamada@example.com",
-    specialties:["総合診療","内科"], capabilities:["当直","外来応援","健診応援","ワクチン"],
-    homeBase:"ITM", completedCount:12, status:"承認",
-    licenseNo:"123456", hokeniNo:"", files:{license:"license_yamada.jpg", kyc:"kyc_yamada.jpg"},
-    credentials:[
-      {type:"医師免許", status:"承認"},
-      {type:"本人確認", status:"承認"},
-      {type:"保険医登録", status:"確認中"},
-    ],
-  });
-  // 募集（実在の離島病院に紐づけ）
-  const P = (o)=>Object.assign({transport:"全額 病院負担", requiredCredentials:["医師免許"], status:"open"}, o);
-  db.postings.push(
-    P({id:"po_1", hospitalId:"hp_1", urgent:false, date:"2026-07-12", timeStart:"09:00", timeEnd:"12:00", overnight:false,
-       type:"ワクチン", cls:"b-vac", department:"—", pay:60000,
-       lodging:"前泊（宿は病院手配）", ground:"病院の送迎あり", note:"定期予防接種の応援。半日のみ。"}),
-    P({id:"po_2", hospitalId:"hp_1", urgent:false, date:"2026-07-18", timeStart:"18:00", timeEnd:"09:00", overnight:true,
-       type:"当直", cls:"b-touku", department:"内科", pay:120000,
-       lodging:"当直→翌朝そのまま帰路", ground:"病院の送迎あり（空港⇄病院）", note:"当直は比較的落ち着いています。救急は二次まで。"}),
-    P({id:"po_3", hospitalId:"hp_2", urgent:true, date:"2026-07-20", timeStart:"17:00", timeEnd:"09:00", overnight:true,
-       type:"当直", cls:"b-touku", department:"内科", pay:130000,
-       lodging:"当直→翌朝そのまま帰路", ground:"病院の送迎あり", note:"直前の欠員。へき地手当込み。"}),
-    P({id:"po_4", hospitalId:"hp_2", urgent:false, date:"2026-07-12", timeStart:"09:00", timeEnd:"17:00", overnight:false,
-       type:"外来応援", cls:"b-gairai", department:"総合内科", pay:95000,
-       requiredCredentials:["医師免許","保険医登録"],
-       lodging:"前泊＋勤務後1泊の可能性", ground:"公共交通＋病院の送迎", note:"保険診療のため保険医登録が必要です。"}),
-    P({id:"po_5", hospitalId:"hp_3", urgent:false, date:"2026-07-19", timeStart:"09:00", timeEnd:"15:00", overnight:false,
-       type:"健診応援", cls:"b-kenshin", department:"健診", pay:85000,
-       lodging:"前泊（宿は病院手配）", ground:"レンタカー（実費病院負担）", note:"住民健診の応援。読影なし。"}),
-  );
+  if(DEMO_MODE){
+    // デモ医師（承認済み）
+    db.doctors.push({
+      id:"dr_1", name:"山田 太郎", email:"yamada@example.com",
+      specialties:["総合診療","内科"], capabilities:["当直","外来応援","健診応援","ワクチン"],
+      homeBase:"ITM", completedCount:12, status:"承認",
+      licenseNo:"123456", hokeniNo:"", files:{license:"license_yamada.jpg", kyc:"kyc_yamada.jpg"},
+      credentials:[
+        {type:"医師免許", status:"承認"},
+        {type:"本人確認", status:"承認"},
+        {type:"保険医登録", status:"確認中"},
+      ],
+    });
+    // 募集（実在の離島病院に紐づけ）
+    const P = (o)=>Object.assign({transport:"全額 病院負担", requiredCredentials:["医師免許"], status:"open"}, o);
+    db.postings.push(
+      P({id:"po_1", hospitalId:"hp_1", urgent:false, date:"2026-07-12", timeStart:"09:00", timeEnd:"12:00", overnight:false,
+         type:"ワクチン", cls:"b-vac", department:"—", pay:60000,
+         lodging:"前泊（宿は病院手配）", ground:"病院の送迎あり", note:"定期予防接種の応援。半日のみ。"}),
+      P({id:"po_2", hospitalId:"hp_1", urgent:false, date:"2026-07-18", timeStart:"18:00", timeEnd:"09:00", overnight:true,
+         type:"当直", cls:"b-touku", department:"内科", pay:120000,
+         lodging:"当直→翌朝そのまま帰路", ground:"病院の送迎あり（空港⇄病院）", note:"当直は比較的落ち着いています。救急は二次まで。"}),
+      P({id:"po_3", hospitalId:"hp_2", urgent:true, date:"2026-07-20", timeStart:"17:00", timeEnd:"09:00", overnight:true,
+         type:"当直", cls:"b-touku", department:"内科", pay:130000,
+         lodging:"当直→翌朝そのまま帰路", ground:"病院の送迎あり", note:"直前の欠員。へき地手当込み。"}),
+      P({id:"po_4", hospitalId:"hp_2", urgent:false, date:"2026-07-12", timeStart:"09:00", timeEnd:"17:00", overnight:false,
+         type:"外来応援", cls:"b-gairai", department:"総合内科", pay:95000,
+         requiredCredentials:["医師免許","保険医登録"],
+         lodging:"前泊＋勤務後1泊の可能性", ground:"公共交通＋病院の送迎", note:"保険診療のため保険医登録が必要です。"}),
+      P({id:"po_5", hospitalId:"hp_3", urgent:false, date:"2026-07-19", timeStart:"09:00", timeEnd:"15:00", overnight:false,
+         type:"健診応援", cls:"b-kenshin", department:"健診", pay:85000,
+         lodging:"前泊（宿は病院手配）", ground:"レンタカー（実費病院負担）", note:"住民健診の応援。読影なし。"}),
+    );
+  }
   return db;
 }
 
@@ -91,7 +100,7 @@ async function ensureSeedUsers(){
     const salt = genSalt();
     DB.users.push({id:"u_"+(DB.seq++), email, salt, hash:await hashPass(pass,salt), role, refId});
   };
-  await mk("yamada@example.com","demo1234","doctor","dr_1");
+  if(DEMO_MODE) await mk("yamada@example.com","demo1234","doctor","dr_1");
   await mk("tokunoshima@example.com","demo1234","hospital","hp_1");
   await mk("yakushima@example.com","demo1234","hospital","hp_2");
   await mk("tanegashima@example.com","demo1234","hospital","hp_3");
