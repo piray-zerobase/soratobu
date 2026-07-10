@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>そらとぶ医局 — 僻地スポット勤務プラットフォーム（クラウド版）</title>
+<meta name="description" content="離島・僻地のスポット医師募集と医師をつなぐ会員制プラットフォーム。地図から選び、実在便で行き帰りを決めて、ワンタップで手を挙げる。">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#076270">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="gbar">
+  <div class="logo" onclick="go(auth.session?'main':'landing')">そらとぶ医局<small>v0.2 クラウド版（未検証・実DB接続前は⏸人間待ち）</small></div>
+  <div id="hdr-right" class="hdr-right"></div>
+</header>
+
+<main class="wrap" id="root"></main>
+
+<div class="ov" id="ov"><div class="modal" id="modal" role="dialog" aria-modal="true" tabindex="-1"></div></div>
+
+<footer class="foot">
+  そらとぶ医局（仮称）は募集情報等提供の「場」を提供するサービスです。職業紹介（あっせん）は行いません。<br>
+  運営：株式会社ゼロベース（予定）｜ 本ページはクラウド接続版（cloud.html）です。実DBでの検証が完了するまで一般公開しません。
+</footer>
+
+<script src="js/seatAvailability.js"></script>
+<script src="js/store-supabase.js"></script>
+<script src="js/cloud-map.js"></script>
+<script src="js/store-cloud.js"></script>
+<script src="js/cloud-boot.js"></script>
+<script>
+/* config.js（接続設定）が無い環境では、あとから読み込まれる js/app.js の
+   window "load" ハンドラ（restoreSession/ensureSeedUsers/render）を
+   実行させず、代わりに案内画面を1回だけ描画する。
+   このスクリプトは js/app.js より前に読み込むことで、load イベントの
+   リスナー登録順を先にし、stopImmediatePropagation() で後続（app.js側）の
+   リスナー実行を止める。 */
+window.addEventListener("load", function(e){
+  if(typeof SORATOBU_CONFIG !== "undefined") return; // 接続設定あり：通常通りapp.jsに任せる
+  document.getElementById("hdr-right").innerHTML = "";
+  document.getElementById("root").innerHTML = `
+    <div class="card">
+      <div class="paneltitle" style="font-size:15px;font-weight:800;color:var(--ink,#173038);">⏸ 未接続：接続設定が必要です</div>
+      <div class="notice">
+        このページ（cloud.html）はSupabase接続用の構成です。<b>js/config.js</b> が見つからないため起動できません。<br>
+        js/config.example.js を js/config.js としてコピーし、SUPABASE_URL・SUPABASE_ANON_KEY を設定してください（この作業は人間ゲートです。エージェントは接続鍵を作成・コミットしません）。<br>
+        デモ版（ブラウザ内データのみ）は <a href="index.html">index.html</a> をご利用ください。
+      </div>
+    </div>`;
+  e.stopImmediatePropagation();
+}, false);
+</script>
+<script src="js/master.js"></script>
+<script src="js/app.js"></script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
