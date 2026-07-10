@@ -28,8 +28,29 @@ function toast(msg){
   const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
   document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
 }
-function openModal(html){ $("modal").innerHTML=html; $("ov").classList.add("show"); }
-function closeModal(){ $("ov").classList.remove("show"); CHAT_AP=null; }
+let MODAL_LAST_FOCUS = null;
+function openModal(html){
+  MODAL_LAST_FOCUS = document.activeElement;
+  $("modal").innerHTML=html; $("ov").classList.add("show");
+  const first = $("modal").querySelector('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+  (first || $("modal")).focus();
+}
+function closeModal(){
+  $("ov").classList.remove("show"); CHAT_AP=null;
+  if(MODAL_LAST_FOCUS && typeof MODAL_LAST_FOCUS.focus==="function") MODAL_LAST_FOCUS.focus();
+  MODAL_LAST_FOCUS = null;
+}
+function modalKeydown(e){
+  if(!$("ov").classList.contains("show")) return;
+  if(e.key==="Escape"){ closeModal(); return; }
+  if(e.key!=="Tab") return;
+  const list = Array.from($("modal").querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'))
+    .filter(el=>!el.disabled && el.offsetParent!==null);
+  if(!list.length) return;
+  const first=list[0], last=list[list.length-1];
+  if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+}
 
 /* ---------- ルーティング ---------- */
 function go(v){ VIEW=v; DETAIL=null; render(); }
@@ -788,5 +809,6 @@ window.addEventListener("load", async ()=>{
   restoreSession();
   await ensureSeedUsers();
   $("ov").addEventListener("click", e=>{ if(e.target.id==="ov") closeModal(); });
+  document.addEventListener("keydown", modalKeydown);
   render();
 });
