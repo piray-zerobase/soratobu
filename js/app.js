@@ -247,17 +247,17 @@ function renderDoctorOnboard(root){
     <div class="authnote">※デモ版ではファイルはアップロードされず、ファイル名のみ記録されます</div>
   </div>`;
 }
-function doRegisterDoctor(){
+async function doRegisterDoctor(){
   const specs=[...document.querySelectorAll("#d-specs .pick.on")].map(e=>e.textContent);
   const caps=[...document.querySelectorAll("#d-caps .pick.on")].map(e=>e.textContent);
   if(!$("d-name").value.trim()) return toast("⚠️ 氏名を入力してください");
   if(!isValidLicenseNo($("d-lic").value.trim())) return toast("⚠️ 医籍登録番号は5〜7桁の数字で入力してください");
   if(!specs.length||!caps.length) return toast("⚠️ 診療科と対応業務を選んでください");
   if(!$("d-file1").files.length||!$("d-file2").files.length) return toast("⚠️ 免許証と本人確認書類を添付してください");
-  const r=api.registerDoctor(auth.session.userId,{
+  const r = await Promise.resolve(api.registerDoctor(auth.session.userId,{
     name:$("d-name").value.trim(), licenseNo:$("d-lic").value.trim(), hokeniNo:$("d-hoken").value.trim(),
     specialties:specs, capabilities:caps, homeBase:$("d-base").value,
-    files:{license:$("d-file1").files[0].name, kyc:$("d-file2").files[0].name}});
+    files:{license:$("d-file1").files[0].name, kyc:$("d-file2").files[0].name}}));
   if(r.err) return toast("⚠️ "+r.err);
   toast("提出しました。審査中でも募集の閲覧はできます");
   render();
@@ -290,21 +290,21 @@ function renderHospitalOnboard(root){
   </div>`;
 }
 function setHospOnboardMode(m){ window._hospOnboardMode=m; render(); }
-function doJoinHospitalByCode(){
+async function doJoinHospitalByCode(){
   const code=$("h-code").value.trim();
   if(!code) return toast("⚠️ 招待コードを入力してください");
-  const r=api.joinHospitalByInviteCode(auth.session.userId, code);
+  const r = await Promise.resolve(api.joinHospitalByInviteCode(auth.session.userId, code));
   if(r.err) return toast("⚠️ "+r.err);
   window._hospOnboardMode=null;
   toast(`${r.hospitalName} の担当者として参加しました`);
   render();
 }
-function doRegisterHospital(){
+async function doRegisterHospital(){
   const tel=$("h-tel").value.trim();
   if(tel && !isValidPhone(tel)) return toast("⚠️ 電話番号の形式が正しくありません（例：0997-83-1100）");
-  const r=api.registerHospital(auth.session.userId,{
+  const r = await Promise.resolve(api.registerHospital(auth.session.userId,{
     pref:$("h-pref").value, name:$("h-name").value.trim(), address:$("h-addr").value.trim(),
-    phone:$("h-tel").value.trim(), facilities:$("h-fac").value.trim()});
+    phone:$("h-tel").value.trim(), facilities:$("h-fac").value.trim()}));
   if(r.err) return toast("⚠️ "+r.err);
   toast(r.matched ? "実在病院マスタと一致しました。利用を開始できます" : "登録しました。運営の実在確認をお待ちください");
   render();
@@ -521,7 +521,7 @@ function confirmApply(){
     <div class="mfoot"><button class="btn ghost" onclick="closeModal()">戻る</button>
     <button class="btn green" onclick="doApply()">この内容で手を挙げる ✋</button></div>`);
 }
-function doApply(){
+async function doApply(){
   const p=getPosting(DETAIL);
   const h=getHospital(p.hospitalId);
   const outs=outboundOptions(p,h), rets=returnOptions(p,h);
@@ -530,37 +530,37 @@ function doApply(){
     ? {summary:`${o.prevDay?"前日入り ":""}${o.legs.map(f=>f.no).join("+")} ／ 帰り ${r.legs.map(f=>f.no).join("+")}（${r.home}）`,
        outbound:o.legs.map(f=>f.no), return:r.legs.map(f=>f.no), airportArriveBy:o.by, homeArriveAt:r.home, booking:"未予約"}
     : {summary:"経路は各自確認（便データ準備中の病院）", booking:"未予約"};
-  const res=api.apply(dr().id, p.id, itin);
+  const res = await Promise.resolve(api.apply(dr().id, p.id, itin));
   if(res.err) return toast("⚠️ "+res.err);
   closeModal(); DETAIL=null; DTAB="my"; render();
   toast("手を挙げました！マイページから病院とやりとりできます");
 }
-function doWithdraw(apId){
+async function doWithdraw(apId){
   const reason=prompt("取り下げの理由（病院に通知されます）","都合がつかなくなったため");
   if(reason===null) return;
-  const r=api.withdraw(dr().id, apId, reason);
+  const r = await Promise.resolve(api.withdraw(dr().id, apId, reason));
   if(r.err) return toast("⚠️ "+r.err);
   render(); toast("取り下げました");
 }
-function doBook(asgId){
-  const r=api.selfReportBooking(dr().id, asgId);
+async function doBook(asgId){
+  const r = await Promise.resolve(api.selfReportBooking(dr().id, asgId));
   if(r.err) return toast("⚠️ "+r.err);
   render(); toast("予約済みにしました");
 }
 /* 確定後のキャンセル：医師・病院どちらの画面からも呼ばれる共通処理 */
-function doCancelAssignment(asgId){
+async function doCancelAssignment(asgId){
   const reason=prompt("キャンセルの理由を入力してください（相手に通知されます・必須）","");
   if(reason===null) return;
   if(!reason.trim()) return toast("⚠️ 理由を入力してください");
   if(!confirm("確定した勤務をキャンセルします。よろしいですか？\nこの操作は取り消せません。")) return;
   const s=auth.session;
-  const r=api.cancelAssignment(s.role, s.refId, asgId, reason);
+  const r = await Promise.resolve(api.cancelAssignment(s.role, s.refId, asgId, reason));
   if(r.err) return toast("⚠️ "+r.err);
   closeModal(); render(); toast("キャンセルしました");
 }
 
 /* ---------- チャット（医師↔病院） ---------- */
-function openChat(apId){
+async function openChat(apId){
   CHAT_AP=apId; drawChat();
 }
 function drawChat(){
@@ -588,9 +588,9 @@ function drawChat(){
     <div class="mfoot"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
   const log=$("chatlog"); if(log) log.scrollTop=log.scrollHeight;
 }
-function sendChat(){
+async function sendChat(){
   const text=$("chat-inp").value;
-  const r=api.sendMessage(CHAT_AP, auth.session.role, auth.session.refId, text);
+  const r = await Promise.resolve(api.sendMessage(CHAT_AP, auth.session.role, auth.session.refId, text));
   if(r.err) return toast("⚠️ "+r.err);
   drawChat();
 }
@@ -668,13 +668,13 @@ function hospSlot(poId){
         ${asg.status==="confirmed"?`<button class="btn green" onclick="doComplete('${asg.id}')">勤務完了 ✓</button>`:""}</div>`);
   }
 }
-function doApprove(apId){
+async function doApprove(apId){
   if(!confirm("この先生を承認しますか？\n承認すると、この枠の他の応募者は自動的にお断りになります。")) return;
-  const r=api.approve(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("承認しました。医師と連絡先が相互開示されます");
+  const r = await Promise.resolve(api.approve(hp().id,apId)); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("承認しました。医師と連絡先が相互開示されます");
 }
-function doDecline(apId){
+async function doDecline(apId){
   if(!confirm("この先生をお断りしますか？\nこの操作は取り消せません。")) return;
-  const r=api.decline(hp().id,apId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("お断りしました");
+  const r = await Promise.resolve(api.decline(hp().id,apId)); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("お断りしました");
 }
 function copyInviteCode(code){
   if(navigator.clipboard && navigator.clipboard.writeText){
@@ -683,15 +683,15 @@ function copyInviteCode(code){
     toast("コード："+code);
   }
 }
-function doRegenInviteCode(){
+async function doRegenInviteCode(){
   if(!confirm("招待コードを再発行しますか？\n古いコードはこの操作後、参加に使えなくなります。")) return;
-  const r=api.regenerateInviteCode(auth.session.userId);
+  const r = await Promise.resolve(api.regenerateInviteCode(auth.session.userId));
   if(r.err) return toast("⚠️ "+r.err);
   render(); toast("招待コードを再発行しました");
 }
-function doComplete(asgId){
+async function doComplete(asgId){
   if(!confirm("この勤務を完了にしますか？\n完了後は取り消せません。")) return;
-  const r=api.complete(hp().id,asgId); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました");
+  const r = await Promise.resolve(api.complete(hp().id,asgId)); if(r.err)return toast("⚠️ "+r.err); closeModal(); render(); toast("完了にしました");
 }
 function openWizard(fromId){
   const src = fromId ? getPosting(fromId) : null;
@@ -751,15 +751,15 @@ function wizNext(){
   if(wiz.step===2&&!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");return;}
   wiz.step++; drawWiz();
 }
-function wizPublish(){
+async function wizPublish(){
   if(!(Number.isInteger(+wiz.day)&&+wiz.day>=1&&+wiz.day<=31)){toast("⚠️ 日にちを入れてください");wiz.step=0;drawWiz();return;}
   if(!(+wiz.pay>0)){toast("⚠️ 報酬を入力してください");wiz.step=2;drawWiz();return;}
   const t=W_TIMES[wiz.ti];
-  const r=api.publishPosting(hp().id,{date:`2026-07-${String(+wiz.day).padStart(2,"0")}`,
+  const r = await Promise.resolve(api.publishPosting(hp().id,{date:`2026-07-${String(+wiz.day).padStart(2,"0")}`,
     timeStart:t[0],timeEnd:t[1],overnight:t[2],type:W_TYPES[wiz.ty][0],cls:W_TYPES[wiz.ty][1],
     department:wiz.dept,urgent:wiz.urgent,requiredCredentials:["医師免許"],pay:+wiz.pay||0,
     transport:"全額 病院負担",lodging:t[2]?"当直→翌朝そのまま帰路":"前泊（宿は病院手配）",
-    ground:"病院の送迎あり",note:wiz.note||"—"});
+    ground:"病院の送迎あり",note:wiz.note||"—"}));
   if(r.err) return toast("⚠️ "+r.err);
   closeModal(); render(); toast("募集を公開しました。医師側の地図・日付にすぐ出ます");
 }
@@ -800,9 +800,9 @@ function renderAdmin(root){
   <div style="margin-bottom:8px;"><button class="btn sm ghost" onclick="if(confirm('デモデータを初期化しますか？')){resetDB();location.reload();}">デモデータ初期化</button></div>
   ${listAuditLog(40).map(a=>`<div class="audit">[${a.ts}] <b>${esc(a.actor)}</b> ${esc(a.action)}<br>${esc(a.detail||"")}</div>`).join("")}`;
 }
-function doVerifyDr(id,ok){ const r=api.verifyDoctor(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
-function doVerifyHp(id,ok){ const r=api.verifyHospital(auth.session.userId,id,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
-function doVerifyCred(id,type,ok){ const r=api.verifyCredential(auth.session.userId,id,type,ok); if(r.err)return toast("⚠️ "+r.err); render(); toast("処理しました"); }
+async function doVerifyDr(id,ok){ const r = await Promise.resolve(api.verifyDoctor(auth.session.userId,id,ok)); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
+async function doVerifyHp(id,ok){ const r = await Promise.resolve(api.verifyHospital(auth.session.userId,id,ok)); if(r.err)return toast("⚠️ "+r.err); render(); toast(ok?"承認しました":"却下しました"); }
+async function doVerifyCred(id,type,ok){ const r = await Promise.resolve(api.verifyCredential(auth.session.userId,id,type,ok)); if(r.err)return toast("⚠️ "+r.err); render(); toast("処理しました"); }
 
 /* ---------- init ---------- */
 window.addEventListener("load", async ()=>{
