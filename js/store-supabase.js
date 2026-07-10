@@ -169,3 +169,53 @@ async function fetchMessages(applicationId){
     .order("created_at", { ascending: true });
   return error ? { err: error.message } : { ok: true, data };
 }
+async function fetchMyDoctor(){
+  assertClient();
+  if(!auth.session || !auth.session.userId) return { err: "未ログインです" };
+  const { data, error } = await sbClient
+    .from("doctors").select("*, credentials(*)")
+    .eq("user_id", auth.session.userId).maybeSingle();
+  return error ? { err: error.message } : { ok: true, data };
+}
+async function fetchMyHospital(){
+  assertClient();
+  if(!auth.session || !auth.session.refId) return { err: "病院登録が必要です" };
+  const { data, error } = await sbClient
+    .from("hospitals").select("*")
+    .eq("id", auth.session.refId).maybeSingle();
+  return error ? { err: error.message } : { ok: true, data };
+}
+/* 病院向け：自院の募集への応募一覧（RLSでも自院分のみに絞られる。ここでも明示的に絞る） */
+async function fetchApplicationsForMyPostings(){
+  assertClient();
+  if(!auth.session || !auth.session.refId) return { err: "病院登録が必要です" };
+  const { data, error } = await sbClient
+    .from("applications").select("*, postings!inner(*), doctors(*)")
+    .eq("postings.hospital_id", auth.session.refId)
+    .order("applied_at", { ascending: false });
+  return error ? { err: error.message } : { ok: true, data };
+}
+/* 医師・病院どちらのロールでも呼べる：RLSがdoctor_id/hospital_idで自動的に絞る */
+async function fetchMyAssignments(){
+  assertClient();
+  const { data, error } = await sbClient
+    .from("assignments").select("*, postings(*), doctors(*), hospitals(*)")
+    .order("created_at", { ascending: false });
+  return error ? { err: error.message } : { ok: true, data };
+}
+/* 運営（admin）向け：審査中の医師・病院、確認中credentials、監査ログ最新50件をまとめて取得 */
+async function fetchAdminQueues(){
+  assertClient();
+  const [doctorsQ, hospitalsQ, credsQ, auditQ] = await Promise.all([
+    sbClient.from("doctors").select("*").eq("status", "審査中"),
+    sbClient.from("hospitals").select("*").eq("status", "審査中"),
+    sbClient.from("credentials").select("*, doctors(name)").eq("status", "確認中"),
+    sbClient.from("audit_log").select("*").order("created_at", { ascending: false }).limit(50),
+  ]);
+  const failed = [doctorsQ, hospitalsQ, credsQ, auditQ].find(r => r.error);
+  if(failed) return { err: failed.error.message };
+  return { ok: true, data: {
+    doctors: doctorsQ.data, hospitals: hospitalsQ.data,
+    credentials: credsQ.data, auditLog: auditQ.data,
+  }};
+}
